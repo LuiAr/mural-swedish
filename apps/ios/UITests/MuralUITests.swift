@@ -66,6 +66,7 @@ final class MuralUITests: XCTestCase {
     }
 
     func testTagalogOnboarding() { checkNewOnboarding(id: "tl", greeting: "Kumusta!") }
+    func testSwedishOnboarding() { checkNewOnboarding(id: "sv", greeting: "Hej!") }
 
     func testGermanOnboarding() { checkNewOnboarding(id: "de", greeting: "Hallo!") }
     func testItalianOnboarding() { checkNewOnboarding(id: "it", greeting: "Ciao!") }
@@ -104,7 +105,8 @@ final class MuralUITests: XCTestCase {
             ("Italian · Italy", "Italian", "Ciao!", "Un caffè?"),
             ("Portuguese · Brazil", "Portuguese", "Olá!", "Um cafezinho?"),
             ("Mandarin Chinese · Mainland China", "Mandarin Chinese", "你好！", "喝杯咖啡？"),
-            ("Tagalog (Filipino) · Philippines", "Tagalog (Filipino)", "Kumusta!", "Kape tayo?")
+            ("Tagalog (Filipino) · Philippines", "Tagalog (Filipino)", "Kumusta!", "Kape tayo?"),
+            ("Swedish · Sweden", "Swedish", "Hej!", "Fika?")
         ] {
             app.buttons["Settings"].tap()
             app.buttons["learning-language-picker"].tap()
@@ -273,6 +275,38 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(saved.exists)
         saved.tap()
         XCTAssertTrue(app.staticTexts["Gusto ko ng kape."].exists)
+    }
+
+    func testSwedishTranscriptAndEnglishMeaningSurviveLanguageSwitch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--ended-conversation", "--preview-language=sv", "--preview-free-boundary"]
+        app.launch()
+        XCTAssertTrue(app.buttons["new-conversation"].waitForExistence(timeout: 10))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["target-caption"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["target-caption"].label, "Jag gillar kaffe.")
+        XCTAssertEqual(app.staticTexts["meaning-caption"].label, "I like coffee.")
+        app.buttons["Conversation transcript"].tap()
+        XCTAssertTrue(app.staticTexts["Jag gillar kaffe."].exists)
+        app.buttons["Done"].tap()
+        app.buttons["start-conversation"].tap()
+        app.buttons["new-conversation"].tap()
+        XCTAssertEqual(app.staticTexts["target-caption"].label, "Hej!")
+        app.buttons["Settings"].tap()
+        app.buttons["learning-language-picker"].tap()
+        app.buttons["Norwegian · Bokmål"].tap()
+        app.buttons["Done"].tap()
+        XCTAssertEqual(app.staticTexts["target-caption"].label, "Hei!")
+        app.buttons["Settings"].tap()
+        app.buttons["learning-language-picker"].tap()
+        app.buttons["Swedish · Sweden"].tap()
+        app.buttons["Done"].tap()
+        app.tabBars.buttons["Words"].tap()
+        app.buttons["Past conversations"].tap()
+        let saved = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fika?")).firstMatch
+        XCTAssertTrue(saved.exists)
+        saved.tap()
+        XCTAssertTrue(app.staticTexts["Jag gillar kaffe."].exists)
     }
 
     func testTagalogLanguageSwitchIsDisabledDuringConversation() {

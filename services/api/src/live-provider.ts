@@ -44,7 +44,8 @@ const languages: Record<string, string> = { 'nb-NO': 'Norwegian Bokmål with an 
   'sr-Latn-RS': 'Standard Serbian as spoken in Serbia, with ekavian forms and the Latin script',
 
   'el-GR': 'Modern Standard Greek as spoken in Greece, with modern pronunciation and monotonic Greek spelling',
-  'tl-PH': 'Tagalog as spoken in the Philippines, using natural everyday wording and polite po/opo when appropriate; accept valid regional Tagalog and established loanwords' };
+  'tl-PH': 'Tagalog as spoken in the Philippines, using natural everyday wording and polite po/opo when appropriate; accept valid regional Tagalog and established loanwords',
+  'sv-SE': 'Standard Swedish as spoken in Sweden, with natural word stress and vowel-consonant length; accept valid regional Swedish including Finland-Swedish' };
 export const supportsLanguage = (language: string) => Object.hasOwn(languages, language);
 const sessionPath = (id: string) => {
   if (!id || id.length > 256 || /[\x00-\x20]/.test(id)) throw new ServiceError('invalid_provider_session', 502);
