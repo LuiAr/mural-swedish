@@ -17,6 +17,7 @@ Language-specific content lives in `apps/ios/Core/Languages/`. Each module defin
 | `sr` | Standard Serbian, ekavian, Latin script | `sr-Latn-RS` |
 | `el` | Modern Standard Greek from Greece | `el-GR` |
 | `tl` | Tagalog/Filipino from the Philippines | `tl-PH` |
+| `sv` | Standard Swedish as spoken in Sweden | `sv-SE` |
 
 These locales describe the initial teaching targets. Modules accept valid regional usage from learners. Regional pronunciation is a model instruction and still needs listening checks. Portuguese's stable `pt` storage ID currently belongs to the Brazilian module; a future independently selectable variety must not silently reinterpret existing progress.
 
@@ -34,7 +35,7 @@ Pinyin appears separately below selectable Chinese text, with a Show/Hide contro
 
 These are compiled modules. Adding one ships with an app update and matching hosted locale support; there is no remote module download. Every new language needs a proficient-speaker teaching and pronunciation review. Regenerate Android's catalog after changing a Swift module.
 
-See [how to add a language](add-language.md) for the implementation steps.
+See [how to add a language](add-language.md) for the implementation steps, and [Swedish teaching guidance](swedish.md) for this fork's English-support setup, research and device checks.
 
 ## Two native cores, one contract
 

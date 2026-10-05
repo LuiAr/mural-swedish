@@ -15,7 +15,7 @@ Built with SwiftUI and Liquid Glass on iPhone, and Jetpack Compose on Android. L
 
 ## Android
 
-A native Android client is available in [`apps/android/`](apps/android/README.md), with voice and written conversation, the same eleven language modules, local learning records and iPhone-compatible JSON backups. Its interface is English, and Spanish on a phone set to Spanish. It runs on Android 8.0 or later and supports Mural minutes or your own OpenAI API key stored with Android Keystore. The iPhone client remains available below.
+A native Android client is available in [`apps/android/`](apps/android/README.md), with voice and written conversation, the same twelve language modules, local learning records and iPhone-compatible JSON backups. Its interface is English, and Spanish on a phone set to Spanish. It runs on Android 8.0 or later and supports Mural minutes or your own OpenAI API key stored with Android Keystore. The iPhone client remains available below.
 
 See the [Android installation/build guide](docs/run-on-android.md) and [Android verification record](verification/android-validation.md). Build a personal-install APK with Java 17 and Android SDK 36:
 
@@ -33,10 +33,13 @@ You need a Mac with Xcode 26 or later, an iPhone running iOS 26.1 or later, an A
 If Codex or another coding agent has access to your Mac's files and terminal, paste the prompt below. The agent can clone, build and install Mural. You handle Apple Account sign-in and team selection in Xcode, device trust and Developer Mode prompts, and API-key entry inside the app. The [iPhone installation guide](docs/run-on-iphone.md) covers each step.
 
 ```text
-Help me build and install Mural on my iPhone from https://github.com/Chuloo/mural.
+Help me build and install my Swedish Mural fork on my iPhone from
+https://github.com/LuiAr/mural-swedish.git, branch codex/add-swedish.
 
 Clone the repository into a new local folder, or use this checkout if it is
-already open. Read README.md, docs/run-on-iphone.md and docs/build-and-test.md.
+already open, preserving local work. Use branch codex/add-swedish. Read
+docs/claude-handoff.md and follow its complete Xcode and iPhone instructions.
+Also read README.md, docs/run-on-iphone.md and docs/build-and-test.md.
 Check that Xcode and its iOS tools are ready, resolve the pinned dependencies,
 run the offline core tests, and build the iOS Simulator target.
 
@@ -62,7 +65,7 @@ I still need to do on the phone. I will start the first live conversation.
 
 Updating an earlier checkout? The iPhone project now lives in `apps/ios/`. Before opening it, follow the [local-settings migration steps](docs/run-on-iphone.md#update-an-earlier-checkout) to preserve your signing team, account configuration and existing app identity.
 
-1. Clone [Chuloo/mural](https://github.com/Chuloo/mural), or download its ZIP. Open `apps/ios/Mural.xcodeproj`.
+1. Clone [LuiAr/mural-swedish](https://github.com/LuiAr/mural-swedish/tree/codex/add-swedish) using `git clone --branch codex/add-swedish https://github.com/LuiAr/mural-swedish.git`, or download [the Swedish branch ZIP](https://github.com/LuiAr/mural-swedish/archive/refs/heads/codex/add-swedish.zip). Open `apps/ios/Mural.xcodeproj`.
 2. In Xcode, open **Settings → Accounts** and add your Apple Account.
 3. Select the **Mural** target, open **Signing & Capabilities**, enable automatic signing, and choose your team. For your own fork, replace the bundle identifier with a unique value such as `com.yourname.mural`. Keep that value stable for later updates.
 4. Connect and unlock your iPhone. Trust the Mac if prompted. Turn on **Settings → Privacy & Security → Developer Mode** on the phone, restart, and confirm the setting.
@@ -83,7 +86,9 @@ A free Personal Team can run the app on your own phone; TestFlight and App Store
 - **A fresh start:** the Talk screen returns to its greeting 15 seconds after a conversation ends. Tap **New conversation** to reset immediately. Your saved conversations and learning remain.
 - **Local records:** export or import a JSON learning backup, delete a conversation, or delete all learning data from Settings.
 
-The modules teach Norwegian Bokmål with an Eastern Norwegian voice target, Spanish from Spain, international English, French from France, German from Germany, Italian from Italy, Brazilian Portuguese, Standard Mandarin with Simplified Chinese, Standard Serbian (Ekavian, Latin script), Modern Standard Greek from Greece and Tagalog/Filipino from the Philippines. Each language has its own conversation themes, teaching guidance and progress. Valid regional alternatives are accepted; Serbian also accepts Cyrillic input. See the [new language guidance](docs/serbian-greek-tagalog.md) for writing, pronunciation and vocabulary rules.
+The modules teach Norwegian Bokmål with an Eastern Norwegian voice target, Spanish from Spain, international English, French from France, German from Germany, Italian from Italy, Brazilian Portuguese, Standard Mandarin with Simplified Chinese, Standard Serbian (Ekavian, Latin script), Modern Standard Greek from Greece, Tagalog/Filipino from the Philippines and Standard Swedish from Sweden. Each language has its own conversation themes, teaching guidance and progress. Valid regional alternatives are accepted; Serbian also accepts Cyrillic input. See the [new language guidance](docs/serbian-greek-tagalog.md) for writing, pronunciation and vocabulary rules.
+
+This personal fork adds Swedish with English subtitles and word explanations. Choose **Swedish · Sweden** and **English** during onboarding, then use your own API key. French or English replies are accepted as support. [Swedish teaching guidance](docs/swedish.md) records the research, implementation and remaining iPhone validation; pronunciation and learning outcomes have not yet been verified on a device for Swedish. The [Claude handoff prompt](docs/claude-handoff.md) covers building, testing and installing this branch on your Mac and iPhone; API-key entry can wait until after offline setup.
 
 An active voice conversation continues when the phone dims, locks or Mural moves to the background. Android shows an ongoing notification with an End action. Returning to Mural restores the same conversation. Audio interruptions, the chosen duration and the existing silence limit still end the call.
 

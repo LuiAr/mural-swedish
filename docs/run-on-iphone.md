@@ -37,7 +37,7 @@ Both paths remain ignored by Git. If both files exist, compare them privately an
 
 ## Install
 
-1. Download the [repository ZIP](https://github.com/Chuloo/mural/archive/refs/heads/main.zip) and extract it, or clone [Chuloo/mural](https://github.com/Chuloo/mural). Open `apps/ios/Mural.xcodeproj`. Allow Xcode to resolve the pinned WebRTC package.
+1. Download the [Swedish branch ZIP](https://github.com/LuiAr/mural-swedish/archive/refs/heads/codex/add-swedish.zip) and extract it, or run `git clone --branch codex/add-swedish https://github.com/LuiAr/mural-swedish.git` to clone [this personal fork](https://github.com/LuiAr/mural-swedish/tree/codex/add-swedish). Open `apps/ios/Mural.xcodeproj`. Allow Xcode to resolve the pinned WebRTC package. The [Claude handoff prompt](claude-handoff.md) covers the remaining Mac and device checks.
 2. Select the blue **Mural** project in the navigator. Under **Targets**, choose **Mural**, then open **Signing & Capabilities**.
 3. Enable **Automatically manage signing** and choose your Apple team. For a fork, set a unique bundle identifier, such as `com.yourname.mural`. Do not change an existing installation’s identifier when refreshing it.
 4. Connect the iPhone, unlock it, and accept **Trust This Computer** if shown. In Xcode’s **Window → Devices and Simulators**, wait for the phone to finish preparing.

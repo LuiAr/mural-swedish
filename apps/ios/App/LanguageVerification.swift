@@ -150,7 +150,8 @@ extension AudioVerification {
                 "zh": "如果你开一家咖啡馆，你会怎样在使用本地食材和保持价格合理之间取得平衡？",
                 "sr": "Kad bi otvorio kafić, kako bi pomirio domaće namirnice sa pristupačnim cenama?",
                 "el": "Αν άνοιγες μια καφετέρια, πώς θα κρατούσες προσιτές τις τιμές χρησιμοποιώντας τοπικά υλικά;",
-                "tl": "Kung magbubukas ka ng kapihan, paano mo mapapanatiling abot-kaya ang mga presyo habang gumagamit ng mga lokal na sangkap?"
+                "tl": "Kung magbubukas ka ng kapihan, paano mo mapapanatiling abot-kaya ang mga presyo habang gumagamit ng mga lokal na sangkap?",
+                "sv": "Om du öppnade ett kafé, hur skulle du kunna använda lokala råvaror och samtidigt hålla priserna rimliga?"
             ]
             for reply in ["I am learning. How can I politely order a coffee?", advanced[id] ?? "Tell me more."] {
                 let before = coordinator.session?.fragments.filter { $0.speaker == .assistant }.count ?? 0
@@ -169,7 +170,7 @@ extension AudioVerification {
             }
             report.pinyinAvailable = MandarinPinyin.reading(coordinator.caption) != nil
             report.translated = await waitFor(20) { !coordinator.meaning.isEmpty && !coordinator.translating }
-            let lookupWords = ["de": "Kaffee", "it": "caffè", "pt": "café", "zh": "咖啡", "sr": "kafa", "el": "καφές", "tl": "kape"]
+            let lookupWords = ["de": "Kaffee", "it": "caffè", "pt": "café", "zh": "咖啡", "sr": "kafa", "el": "καφές", "tl": "kape", "sv": "kaffe"]
             do {
                 let result = try await coordinator.lookup(word: lookupWords[id] ?? coordinator.language.greetingWord, sentence: coordinator.caption)
                 report.lookupReturned = !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
