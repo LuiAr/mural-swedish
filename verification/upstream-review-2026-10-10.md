@@ -6,7 +6,7 @@ Draft PR: https://github.com/LuiAr/mural-swedish/pull/2
 
 Branch: `codex/upstream-review-2026-10-10`, in `/Users/louisar/.codex/worktrees/upstream-review/mural-swedish`.
 
-Fork main was fetched at task start and before the draft PR; it remains `a21c072`. The fork is two commits ahead of the common ancestor and upstream adds seven commits through `Chuloo/mural@7bf1128` (#165). The upstream history is merged, not squash-copied.
+Fork main was fetched at task start, before the draft PR and after all verification; it remains `a21c072`. At comparison, the fork was two commits ahead of the common ancestor and upstream adds seven commits through `Chuloo/mural@7bf1128` (#165). The upstream history is merged, not squash-copied.
 
 The original checkout remains on `claude/personal-signing-config`, with all 26 changed/untracked source and verification files unchanged (hash-checked against the snapshot). `8c548f2` preserves that work on this branch before the upstream merge `4193b54`. Private local signing settings were copied into the ignored worktree-local xcconfig and never committed. No main reset, main merge, phone installation or data migration was performed.
 
@@ -46,7 +46,7 @@ Existing SDK warnings remain: the StoreKit purchase-error switch, the callback s
 - [Contracts](https://github.com/LuiAr/mural-swedish/actions/runs/38042375108): tooling, generated content and cross-platform parity passed.
 - [Secret scan](https://github.com/LuiAr/mural-swedish/actions/runs/38042439811): redacted history scan passed.
 - [Initial Android](https://github.com/LuiAr/mural-swedish/actions/runs/38042376873): unit/lint/build/release checks passed; emulator 92/94 passed, with two missing Swedish-fixture assertions corrected in `c2e5681`.
-- [Corrected Android run](https://github.com/LuiAr/mural-swedish/actions/runs/38043102253): in progress at report creation; update before handover.
+- [Corrected Android run](https://github.com/LuiAr/mural-swedish/actions/runs/38043102253): all jobs passed on `c2e5681`, including release validation, Android unit/lint/build checks and the complete emulator interface suite. The missing Swedish fixtures are verified. Subsequent branch commits only add verification documentation and the screenshot.
 
 ## Release scope and manual review
 
