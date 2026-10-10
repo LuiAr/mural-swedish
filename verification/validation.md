@@ -1,5 +1,7 @@
 # Build verification
 
+10 October 2026: [Main merge and personal iPhone delivery](ios-main-release-2026-10-10.md) records merged PR #2, the signed build from main, successful installation and on-device readback of Mural 1.0 (5). No app launch, live call or backend deployment was required.
+
 10 October 2026: [Microphone mute restored](ios-mute-control-2026-10-10.md) records the separate Mute/Unmute footer action alongside Pause, passing simulator/signed builds, four native UI checks and a reviewed long-caption screenshot. This local addition needs no server deployment; main and the installed phone app remain unchanged.
 
 10 October 2026: [Upstream review branch](upstream-review-2026-10-10.md) records the isolated upstream merge, preserved personal-key features and Swedish, combined adaptive/following captions, signed builds, 220 core/78 tooling/18 targeted UI checks, and PostgreSQL/Android CI results. Main and production remain unchanged.
