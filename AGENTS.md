@@ -44,3 +44,9 @@ Keep Resume/New conversation choices in the native sheet. Dismissing it preserve
 ## Adaptive iOS Talk captions
 
 Size Talk against the actual wrapped source, meaning and optional pinyin with `ViewThatFits`. Reduce the orb before scrolling; keep the call controls anchored on ordinary portrait screens. Very long source and meaning use one shared scroll area with natural text heights, rather than two equal-height scroll areas. Accessibility sizes and short windows use whole-page scrolling without nested vertical scroll views. Talk owns the pinyin expansion binding so fitting a different layout preserves Show/Hide state. Keep source word links, meaning toggling and pinyin interaction intact. Verify with offline `--preview-long-caption` and `--preview-overflow-caption` fixtures, including accessibility text and Mandarin.
+
+## Upstream review integration
+
+The upstream review branch retains adaptive caption sizing and uses upstream `FollowingPassage`/`CaptionFollowing` only for the shared overflow viewport. Touching it pauses automatic following for that passage across streaming revisions, meaning visibility and tab changes; a new passage starts following again. Accessibility and short windows keep whole-page scrolling. The two following UI checks use `conversation-passage-scroll`. Keep simulator-only preview setup behind `targetEnvironment(simulator)` so signed device builds compile.
+
+Flashcard words stay non-selectable on iOS 27 so text selection does not intercept card swipes; words remain available in the Words library. Verify horizontal paging, vertical long-meaning scrolling and accessibility text sizes together. Upstream guest/account deletion and hosted Dutch/Russian support require matching backend behavior before a hosted release; an isolated personal-key review branch is not a production deployment.
