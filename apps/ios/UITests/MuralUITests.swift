@@ -280,6 +280,11 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(cost.waitForExistence(timeout: 5))
     }
 
+    private func waitForFlashcardPage(_ value: String, in pager: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Flashcard did not reach \(value)", file: file, line: line)
+    }
+
     private func confirmAdult(in app: XCUIApplication) {
         let control = app.switches["onboarding-adult-confirmation"]
         XCTAssertTrue(control.exists)
@@ -1428,15 +1433,15 @@ final class MuralUITests: XCTestCase {
         trigger.tap()
         let progress = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         XCTAssertTrue(progress.waitForExistence(timeout: 5))
-        XCTAssertEqual(progress.value as? String, "1 of 4")
+        waitForFlashcardPage("1 of 4", in: progress)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         let card = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         let shortDrag = card
         let start = shortDrag.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -24, dy: 0)))
-        XCTAssertEqual(progress.value as? String, "1 of 4")
+        waitForFlashcardPage("1 of 4", in: progress)
         shortDrag.swipeRight()
-        XCTAssertEqual(progress.value as? String, "1 of 4")
+        waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertFalse(app.buttons["Previous word"].exists)
         XCTAssertFalse(app.staticTexts["flashcard-progress"].exists)
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
@@ -1448,21 +1453,21 @@ final class MuralUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         card.swipeLeft()
-        XCTAssertEqual(progress.value as? String, "2 of 4")
+        waitForFlashcardPage("2 of 4", in: progress)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         card.swipeUp()
-        XCTAssertEqual(progress.value as? String, "2 of 4")
+        waitForFlashcardPage("2 of 4", in: progress)
         card.swipeDown()
-        XCTAssertEqual(progress.value as? String, "2 of 4")
+        waitForFlashcardPage("2 of 4", in: progress)
         card.swipeRight()
-        XCTAssertEqual(progress.value as? String, "1 of 4")
+        waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertEqual(app.staticTexts["flashcard-word"].label, originalWord)
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         for _ in 0..<3 { card.swipeLeft() }
-        XCTAssertEqual(progress.value as? String, "4 of 4")
+        waitForFlashcardPage("4 of 4", in: progress)
         card.swipeLeft()
-        XCTAssertEqual(progress.value as? String, "4 of 4")
+        waitForFlashcardPage("4 of 4", in: progress)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Flashcards on iPhone"; screenshot.lifetime = .keepAlways; add(screenshot)
         app.buttons["close-flashcards"].tap()
         XCTAssertTrue(trigger.waitForExistence(timeout: 3))
@@ -1478,7 +1483,7 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["flashcard-word"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["close-flashcards"].isHittable)
         app.descendants(matching: .any)["flashcard-pager"].firstMatch.swipeLeft()
-        XCTAssertEqual(app.descendants(matching: .any)["flashcard-pager"].firstMatch.value as? String, "2 of 4")
+        waitForFlashcardPage("2 of 4", in: app.descendants(matching: .any)["flashcard-pager"].firstMatch)
         app.buttons["close-flashcards"].tap()
         // Screenshot fixtures hold their initial language; use a fresh Russian preview for isolation.
         app.terminate()

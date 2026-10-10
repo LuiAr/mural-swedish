@@ -795,7 +795,7 @@ private struct FlashcardView: View {
                 HStack(spacing: 10) { RecallBars(count: word.bars); Text(word.label).font(.subheadline).foregroundStyle(MuralColor.secondary) }
                     .accessibilityElement(children: .combine).accessibilityIdentifier("flashcard-proficiency")
                 Text(word.lemma).font(.system(.largeTitle, design: .rounded, weight: .medium))
-                    .multilineTextAlignment(.center).accessibilityIdentifier("flashcard-word")
+                    .multilineTextAlignment(.center).textSelection(.enabled).accessibilityIdentifier("flashcard-word")
                 if back {
                     Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary).multilineTextAlignment(.center)
                         .accessibilityIdentifier("flashcard-meaning")

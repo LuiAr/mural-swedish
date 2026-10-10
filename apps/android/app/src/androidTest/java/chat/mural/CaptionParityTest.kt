@@ -275,7 +275,7 @@ class CaptionParityTest {
             Triple("de", "Ich möchte Kaffee.", "Kaffee"), Triple("it", "Vorrei un caffè.", "caffè"),
             Triple("pt", "Quero um café.", "café"), Triple("zh", "我想去银行。", "银行"),
             Triple("sr", "Hoću jednu kafu.", "kafu"), Triple("el", "Θα ήθελα έναν καφέ.", "καφέ"),
-            Triple("tl", "Gusto ko ng kape.", "kape"),
+            Triple("tl", "Gusto ko ng kape.", "kape"), Triple("sv", "Jag skulle vilja ha kaffe.", "kaffe"),
             Triple("nl", "Ik wil graag koffie.", "koffie"), Triple("ru", "Я хочу кофе.", "кофе"))
         assertEquals(LanguageRegistry.all.map { it.id }.toSet(), samples.map { it.first }.toSet())
         for ((language, sentence, word) in samples) {
@@ -300,6 +300,7 @@ class CaptionParityTest {
             "sr" to listOf("Volim da uči", "m srp", "ski."),
             "el" to listOf("Πώς εί", "σαι; Μα", "ΐου."),
             "tl" to listOf("Mag-", "aaral ako araw-", "araw."),
+            "sv" to listOf("Jag lär ", "mig sven", "ska."),
             "nl" to listOf("Ik fiets ", "elke dag naar ", "huis."),
             "ru" to listOf("Я чита", "ю интересную ", "книгу."))
         assertEquals(LanguageRegistry.all.map { it.id }.toSet(), samples.keys)
