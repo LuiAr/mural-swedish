@@ -1,5 +1,7 @@
 # Build verification
 
+10 October 2026: [Microphone mute restored](ios-mute-control-2026-10-10.md) records the separate Mute/Unmute footer action alongside Pause, passing simulator/signed builds, four native UI checks and a reviewed long-caption screenshot. This local addition needs no server deployment; main and the installed phone app remain unchanged.
+
 10 October 2026: [Upstream review branch](upstream-review-2026-10-10.md) records the isolated upstream merge, preserved personal-key features and Swedish, combined adaptive/following captions, signed builds, 220 core/78 tooling/18 targeted UI checks, and PostgreSQL/Android CI results. Main and production remain unchanged.
 
 7 October 2026: [OpenAI balance button](ios-balance-button-2026-10-07.md) records the browser link before personal-key calls, in Advanced settings and the cost sheet, passing simulator/signed builds and three native UI checks, owner-confirmed link behavior and iPhone installation.

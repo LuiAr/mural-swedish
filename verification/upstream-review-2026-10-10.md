@@ -13,7 +13,7 @@ The original checkout remains on `claude/personal-signing-config`, with all 26 c
 ## Visible changes and merge decisions
 
 - Preserve Swedish alongside upstream Dutch and Russian in iOS, Android, meaning choices and the server locale allowlist.
-- Retain personal-key voice cost, Pause/Resume, the primary orange Pause control and the OpenAI billing link.
+- Retain personal-key voice cost, Pause/Resume, the primary orange Pause control and the OpenAI billing link. A separate Mute/Unmute footer action is restored alongside Pause; muting keeps the call connected and billing continues. [Follow-up verification](ios-mute-control-2026-10-10.md) records four passing UI checks, builds and the reviewed layout.
 - Keep actual wrapped text sizing, shrinking orb, shared overflow viewport, anchored call controls and whole-page accessibility/short-window scrolling. Upstream gentle caption following replaces the overflow scroll helper, rather than replacing adaptive sizing with two fixed three-line windows. Touch pauses following for the current passage across streaming revisions, meaning toggles and navigation; the next passage resumes it. Pinyin expansion and source word links remain intact.
 - Adopt upstream flashcards, AI processing permission controls, full-capsule onboarding taps and purchase/account recovery changes. Flashcard code remains upstream SwiftUI code; UI tests wait for the page animation to finish before checking accessibility values.
 - Move debug preview setup out of the large SwiftUI body and guard simulator-only caption preview calls. This fixes the imported signed-device compilation error.

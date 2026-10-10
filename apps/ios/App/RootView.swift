@@ -224,6 +224,15 @@ struct TalkView: View {
                 let actionLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 24))
                 actionLayout {
                     if coordinator.state == .active {
+                        if coordinator.conversationProvider == .personalKey {
+                            Button(coordinator.isMuted ? "Unmute" : "Mute", systemImage: coordinator.isMuted ? "mic.slash.fill" : "mic") {
+                                coordinator.toggleMute()
+                            }
+                            .frame(minHeight: 44)
+                            .accessibilityLabel(coordinator.isMuted ? "Unmute microphone" : "Mute microphone")
+                            .accessibilityHint("The call stays connected and voice billing continues")
+                            .accessibilityIdentifier("mute-conversation")
+                        }
                         Button("Type instead", systemImage: "keyboard") { typing = true }
                         Button("A little help", systemImage: "sparkles") { coordinator.help() }
                     } else if coordinator.conversationProvider == .personalKey && !coordinator.isRunning {

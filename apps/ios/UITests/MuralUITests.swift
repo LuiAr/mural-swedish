@@ -136,8 +136,13 @@ final class MuralUITests: XCTestCase {
         app.launchArguments = ["--preview", "--preview-key", "--active-conversation", "--preview-language=sv"]
         app.launch()
         XCTAssertTrue(app.buttons["Pause conversation"].waitForExistence(timeout: 10))
+        let mute = app.buttons["mute-conversation"]
+        XCTAssertTrue(mute.isHittable)
+        mute.tap()
+        XCTAssertEqual(mute.label, "Unmute microphone")
+        XCTAssertEqual(app.buttons["start-conversation"].label, "Pause conversation")
         let activeScreenshot = XCTAttachment(screenshot: app.screenshot())
-        activeScreenshot.name = "Active call with Pause"; activeScreenshot.lifetime = .keepAlways; add(activeScreenshot)
+        activeScreenshot.name = "Muted call retains Pause"; activeScreenshot.lifetime = .keepAlways; add(activeScreenshot)
         app.buttons["Pause conversation"].tap()
         XCTAssertTrue(app.navigationBars["Conversation paused"].waitForExistence(timeout: 5))
         let pausedScreenshot = XCTAttachment(screenshot: app.screenshot())
@@ -156,6 +161,7 @@ final class MuralUITests: XCTestCase {
         app.buttons["resume-conversation"].tap()
         XCTAssertTrue(app.buttons["Pause conversation"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["target-caption"].label, "Vill du ha kaffe eller te?")
+        XCTAssertEqual(mute.label, "Mute microphone")
         XCTAssertNotEqual(cost.label, pausedCost)
         app.buttons["Pause conversation"].tap()
         XCTAssertTrue(app.buttons["resume-conversation"].waitForExistence(timeout: 5))
@@ -204,7 +210,12 @@ final class MuralUITests: XCTestCase {
         app.launch()
         let pause = app.buttons["Pause conversation"]
         XCTAssertTrue(pause.waitForExistence(timeout: 10))
-        for _ in 0..<6 where !pause.isHittable { app.swipeUp() }
+        let mute = app.buttons["mute-conversation"]
+        for _ in 0..<8 where !mute.isHittable { app.swipeUp() }
+        XCTAssertTrue(mute.isHittable)
+        mute.tap()
+        XCTAssertEqual(mute.label, "Unmute microphone")
+        for _ in 0..<8 where !pause.isHittable { app.swipeDown() }
         XCTAssertTrue(pause.isHittable)
         pause.tap()
         let resume = app.buttons["resume-conversation"]
@@ -224,6 +235,15 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(cost.waitForExistence(timeout: 10))
         XCTAssertTrue(cost.label.contains("US$"))
         XCTAssertEqual(app.buttons["start-conversation"].label, "Pause conversation")
+        let caption = app.staticTexts["target-caption"].label
+        let mute = app.buttons["mute-conversation"]
+        XCTAssertTrue(mute.isHittable)
+        XCTAssertEqual(mute.label, "Mute microphone")
+        mute.tap()
+        XCTAssertEqual(mute.label, "Unmute microphone")
+        XCTAssertEqual(app.buttons["start-conversation"].label, "Pause conversation")
+        XCTAssertFalse(app.buttons["resume-conversation"].exists)
+        XCTAssertEqual(app.staticTexts["target-caption"].label, caption)
         let before = cost.label
         let increases = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in cost.label != before }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [increases], timeout: 20), .completed)
@@ -235,6 +255,9 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(cost.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["start-conversation"].label, "Pause conversation")
         XCTAssertTrue(app.buttons["End conversation"].exists)
+        mute.tap()
+        XCTAssertEqual(mute.label, "Mute microphone")
+        XCTAssertEqual(app.buttons["start-conversation"].label, "Pause conversation")
     }
 
     func testEndedPersonalKeyCallCostFreezes() {
