@@ -52,3 +52,7 @@ The upstream review branch retains adaptive caption sizing and uses upstream `Fo
 Flashcard paging finishes asynchronously after its animation. UI checks must wait for the pager’s accessibility value before asserting the selected page; keep upstream SwiftUI paging and vertical long-meaning scrolling intact. Upstream guest/account deletion and hosted Dutch/Russian support require matching backend behavior before a hosted release; an isolated personal-key review branch is not a production deployment.
 
 The Checks, Contracts and Android GitHub workflows support manual `workflow_dispatch` on a review branch. Use this to verify an isolated merge when pull-request events do not start CI; do not change main or production to run validation.
+
+## Installed iOS build identification
+
+Settings → About Mural shows Version and Build from the running app’s `CFBundleShortVersionString` and `CFBundleVersion`; never hardcode the displayed build. Keep `CURRENT_PROJECT_VERSION` aligned in the Xcode project and `scripts/generate_project.py`, and read back the installed version after a phone update. This display is local and needs no server deployment.

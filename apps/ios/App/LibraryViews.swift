@@ -653,6 +653,8 @@ private struct AboutMuralView: View {
         Form {
             Section {
                 LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
+                    .accessibilityIdentifier("app-build-number")
                 Link("AI Data Controls", destination: URL(string: "https://developers.openai.com/api/docs/guides/your-data")!)
                 Button("Open-source notices") { notices = true }
             }
