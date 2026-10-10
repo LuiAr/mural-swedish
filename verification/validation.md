@@ -1,5 +1,19 @@
 # Build verification
 
+10 October 2026: [Microphone mute restored](ios-mute-control-2026-10-10.md) records the separate Mute/Unmute footer action alongside Pause, passing simulator/signed builds, four native UI checks and a reviewed long-caption screenshot. This local addition needs no server deployment; main and the installed phone app remain unchanged.
+
+10 October 2026: [Upstream review branch](upstream-review-2026-10-10.md) records the isolated upstream merge, preserved personal-key features and Swedish, combined adaptive/following captions, signed builds, 220 core/78 tooling/18 targeted UI checks, and PostgreSQL/Android CI results. Main and production remain unchanged.
+
+7 October 2026: [OpenAI balance button](ios-balance-button-2026-10-07.md) records the browser link before personal-key calls, in Advanced settings and the cost sheet, passing simulator/signed builds and three native UI checks, owner-confirmed link behavior and iPhone installation.
+
+7 October 2026: [Talk controls and adaptive captions](ios-talk-controls-and-captions-2026-10-07.md) records the main Pause button, naturally wrapped source/meaning/learner text, adaptive orb, shared overflow scrolling, 16 targeted offline UI checks, signed iPhone build and successful installation. Opening the updated app on the phone remains pending unlock.
+
+6 October 2026: [Personal-key Pause and Resume](ios-pause-resume-2026-10-06.md) records the pause checkpoint, transcript/cost continuity, 208 core tests, eight targeted offline UI checks, signed build and iPhone installation.
+
+6 October 2026: [Personal-key call cost](ios-call-cost-2026-10-06.md) records the voice estimate, 202 core tests, four targeted offline UI checks, and signed iPhone build.
+
+6 October 2026: [iOS build follow-up](ios-build-2026-10-06.md) records successful simulator and signed iPhone builds, 197 Swift and 78 Python tests, four targeted UI checks, and the iOS 27 pinyin-toggle fix.
+
 11 September 2026
 
 - iOS simulator build succeeded with Xcode 26.4.1.

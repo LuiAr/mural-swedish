@@ -1,2 +1,14 @@
-// The Hackmamba release team is configured in the project generator.
-// Put local development overrides here only when needed.
+// Copy to Local.xcconfig, which Git ignores, for a personal build.
+// The Hackmamba release team and identifier are the defaults in Signing.xcconfig.
+// DEVELOPMENT_TEAM = YOURTEAMID
+// MURAL_BUNDLE_IDENTIFIER = com.yourname.mural
+
+// A free Personal Team cannot sign Sign in with Apple. A personal-key build can
+// also leave hosted minutes, managed accounts and purchases off:
+// MURAL_APPLE_SIGN_IN_ENABLED = NO
+// MURAL_APPLE_SWIFT_FLAGS =
+// MURAL_APPLE_ENTITLEMENTS =
+// MURAL_MANAGED_ACCOUNTS_ENABLED = NO
+// MURAL_MANAGED_API_URL =
+// MURAL_GOOGLE_SIGN_IN_ENABLED = NO
+// MURAL_APPLE_PURCHASES_ENABLED = NO

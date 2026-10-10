@@ -7,17 +7,29 @@ import re
 
 root = Path(__file__).resolve().parents[1] / 'apps' / 'ios'
 existing_project = root/'Mural.xcodeproj'/'project.pbxproj'
-existing_team = re.search(r'DEVELOPMENT_TEAM\s*=\s*"?([A-Z0-9]+)', existing_project.read_text()) if existing_project.exists() else None
-if existing_team:
+# Release defaults live in Config/Signing.xcconfig, so the ignored Local.xcconfig can override them.
+release_team, release_bundle = '8PZYNMS6FH', 'chat.mural.ios'
+def remember_locally(name, value):
     local_settings = root/'Config'/'Local.xcconfig'
     local_settings.parent.mkdir(exist_ok=True)
     contents = local_settings.read_text() if local_settings.exists() else '// Personal signing settings. Do not commit.\n'
-    setting = 'DEVELOPMENT_TEAM = ' + existing_team.group(1)
-    if re.search(r'^DEVELOPMENT_TEAM\s*=.*$', contents, re.MULTILINE):
-        contents = re.sub(r'^DEVELOPMENT_TEAM\s*=.*$', setting, contents, flags=re.MULTILINE)
+    setting = f'{name} = {value}'
+    if re.search(rf'^{name}\s*=.*$', contents, re.MULTILINE):
+        contents = re.sub(rf'^{name}\s*=.*$', setting, contents, flags=re.MULTILINE)
     else:
         contents += '\n' + setting + '\n'
     local_settings.write_text(contents)
+# Xcode's signing editor writes a chosen team or identifier into the app target; move personal values into Local.xcconfig.
+# Xcode sorts configurations by ID when it saves, so read every app-target configuration rather than the first match.
+existing = existing_project.read_text() if existing_project.exists() else ''
+app_settings = [s for s in re.findall(r'buildSettings\s*=\s*\{(.*?)\}\s*;', existing, re.DOTALL) if 'TEST_TARGET_NAME' not in s]
+def personal_value(name, release):
+    matches = (re.search(rf'\b{name}\s*=\s*"?([^";\s]+)', s) for s in app_settings)
+    return next((m.group(1) for m in matches if m and '$' not in m.group(1) and m.group(1) != release), None)
+if existing_team := personal_value('DEVELOPMENT_TEAM', release_team):
+    remember_locally('DEVELOPMENT_TEAM', existing_team)
+if existing_bundle := personal_value('PRODUCT_BUNDLE_IDENTIFIER', release_bundle):
+    remember_locally('MURAL_BUNDLE_IDENTIFIER', existing_bundle)
 objects = {}
 def uid(name): return hashlib.sha1(name.encode()).hexdigest()[:24].upper()
 def add(identifier, isa, **fields):
@@ -54,7 +66,7 @@ frameworks = add('frameworks','PBXFrameworksBuildPhase',buildActionMask=21474836
 sourcePhase = add('sources','PBXSourcesBuildPhase',buildActionMask=2147483647,files=sources,runOnlyForDeploymentPostprocessing=0)
 resources = add('resources','PBXResourcesBuildPhase',buildActionMask=2147483647,files=[add('assetsBuild','PBXBuildFile',fileRef=asset),add('noticesBuild','PBXBuildFile',fileRef=notices),add('privacyBuild','PBXBuildFile',fileRef=privacy)],runOnlyForDeploymentPostprocessing=0)
 common = {'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'26.1','SWIFT_VERSION':'5.0','CLANG_ENABLE_MODULES':'YES','CLANG_ENABLE_OBJC_ARC':'YES','SWIFT_STRICT_CONCURRENCY':'targeted'}
-targetSettings = {'PRODUCT_BUNDLE_IDENTIFIER':'chat.mural.ios','PRODUCT_NAME':'$(TARGET_NAME)','TARGETED_DEVICE_FAMILY':'1','GENERATE_INFOPLIST_FILE':'NO','INFOPLIST_FILE':'App/Info.plist','CODE_SIGN_STYLE':'Automatic','DEVELOPMENT_TEAM':'8PZYNMS6FH','MARKETING_VERSION':'1.0','CURRENT_PROJECT_VERSION':'4','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME':'AccentColor','LD_RUNPATH_SEARCH_PATHS':['$(inherited)','@executable_path/Frameworks'],'ENABLE_PREVIEWS':'YES','SUPPORTED_PLATFORMS':'iphoneos iphonesimulator'}
+targetSettings = {'PRODUCT_BUNDLE_IDENTIFIER':'$(MURAL_BUNDLE_IDENTIFIER)','PRODUCT_NAME':'$(TARGET_NAME)','TARGETED_DEVICE_FAMILY':'1','GENERATE_INFOPLIST_FILE':'NO','INFOPLIST_FILE':'App/Info.plist','CODE_SIGN_STYLE':'Automatic','MARKETING_VERSION':'1.0','CURRENT_PROJECT_VERSION':'5','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME':'AccentColor','LD_RUNPATH_SEARCH_PATHS':['$(inherited)','@executable_path/Frameworks'],'ENABLE_PREVIEWS':'YES','SUPPORTED_PLATFORMS':'iphoneos iphonesimulator'}
 targetSettings.update({'CODE_SIGN_ENTITLEMENTS':'$(MURAL_APPLE_ENTITLEMENTS)',
                       'SWIFT_ACTIVE_COMPILATION_CONDITIONS':'$(inherited) $(MURAL_APPLE_SWIFT_FLAGS)'})
 def configs(prefix, settings):
@@ -72,7 +84,7 @@ target=add('target','PBXNativeTarget',buildConfigurationList=configs('target',ta
 testSources = add('testSources','PBXSourcesBuildPhase',buildActionMask=2147483647,files=[add('testBuild','PBXBuildFile',fileRef=testSource)],runOnlyForDeploymentPostprocessing=0)
 proxy = add('testProxy','PBXContainerItemProxy',containerPortal=uid('project'),proxyType=1,remoteGlobalIDString=target,remoteInfo='Mural')
 dependency=add('testDependency','PBXTargetDependency',target=target,targetProxy=proxy)
-testTarget=add('testTarget','PBXNativeTarget',buildConfigurationList=configs('tests',{'PRODUCT_BUNDLE_IDENTIFIER':'chat.mural.ios.uitests','PRODUCT_NAME':'$(TARGET_NAME)','GENERATE_INFOPLIST_FILE':'YES','TEST_TARGET_NAME':'Mural','TARGETED_DEVICE_FAMILY':'1','CODE_SIGN_STYLE':'Automatic','DEVELOPMENT_TEAM':'8PZYNMS6FH'}),buildPhases=[testSources],buildRules=[],dependencies=[dependency],name='MuralUITests',productName='MuralUITests',productReference=testProduct,productType='com.apple.product-type.bundle.ui-testing')
+testTarget=add('testTarget','PBXNativeTarget',buildConfigurationList=configs('tests',{'PRODUCT_BUNDLE_IDENTIFIER':'$(MURAL_BUNDLE_IDENTIFIER).uitests','PRODUCT_NAME':'$(TARGET_NAME)','GENERATE_INFOPLIST_FILE':'YES','TEST_TARGET_NAME':'Mural','TARGETED_DEVICE_FAMILY':'1','CODE_SIGN_STYLE':'Automatic'}),buildPhases=[testSources],buildRules=[],dependencies=[dependency],name='MuralUITests',productName='MuralUITests',productReference=testProduct,productType='com.apple.product-type.bundle.ui-testing')
 project=add('project','PBXProject',attributes={'BuildIndependentTargetsInParallel':'YES','LastUpgradeCheck':'2640','TargetAttributes':{target:{'CreatedOnToolsVersion':'26.4'},testTarget:{'CreatedOnToolsVersion':'26.4','TestTargetID':target}}},buildConfigurationList=configs('project',common),compatibilityVersion='Xcode 14.0',developmentRegion='en',hasScannedForEncodings=0,knownRegions=['en','nb','Base'],mainGroup=group,packageReferences=[corePackage,rtcPackage],productRefGroup=products,projectDirPath='',projectRoot='',targets=[target,testTarget])
 folder=root/'Mural.xcodeproj';folder.mkdir(exist_ok=True)
 folder.joinpath('project.pbxproj').write_text('// !$*UTF8*$!\n'+encode({'archiveVersion':1,'classes':{},'objectVersion':60,'objects':objects,'rootObject':project})+'\n')

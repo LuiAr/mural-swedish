@@ -21,6 +21,7 @@ final class AppleMinutePurchases {
         let quantity: Int
         let date: Date
         let refunded: Bool
+        let testPurchase: Bool
     }
     private(set) var recentPurchases: [RecentPurchase] = []
     private(set) var historyMessage: String?
@@ -89,7 +90,7 @@ final class AppleMinutePurchases {
         }
         Task {
             _ = try? await prepareEnvironment()
-            await checkPurchases(includeHistory: false)
+            await checkPurchases()
         }
     }
     func load() async {
@@ -103,7 +104,7 @@ final class AppleMinutePurchases {
             if let data = try? JSONSerialization.data(withJSONObject: catalog) { offers = (try? JSONDecoder().decode([MinuteOffer].self, from: data)) ?? [] }
             maximumQuantity = 10
             pending = ProcessInfo.processInfo.arguments.contains("--preview-purchase-pending")
-            message = pending ? "Your purchase is awaiting approval. Minutes will appear when it’s complete." : nil
+            message = pending ? ApplePurchaseScope.pendingMessage(testPurchase: testPurchases) : nil
             return
         }
         #endif
@@ -203,11 +204,12 @@ final class AppleMinutePurchases {
                     // StoreKit returned an earlier unfinished consumable instead of
                     // presenting a new payment. Preserve this uncharged order for retry.
                     attempt.phase = .preparing; try save(attempt)
-                    pending = false; message = "Your earlier purchase is complete. Tap Continue when you’re ready to buy more minutes."
+                    pending = false
+                    message = ApplePurchaseScope.completionMessage(testPurchase: testPurchases) + " Tap Continue when you’re ready to buy more minutes."
                 }
             case .pending:
                 attempt.phase = .awaitingApproval; try save(attempt)
-                if current(owner) { pending = true; message = "Your purchase is awaiting approval. Minutes will appear when it’s complete." }
+                if current(owner) { pending = true; message = ApplePurchaseScope.pendingMessage(testPurchase: testPurchases) }
             case .userCancelled:
                 try remove(account: owner.accountID, order: order.orderID)
                 if current(owner) { pending = false; message = "Purchase canceled." }
@@ -220,23 +222,20 @@ final class AppleMinutePurchases {
             }
         }
     }
-    func checkPurchases(includeHistory: Bool = true) async {
+    func checkPurchases() async {
         guard enabled, !checking, !ProcessInfo.processInfo.arguments.contains("--preview"), let owner = member() else { return }
         checking = true; defer { checking = false }
         guard (try? await prepareEnvironment()) != nil else {
             message = "Couldn’t check purchases. Please try again."; return
         }
-        await recoverRecordedOrders(owner: owner)
-        for await result in Transaction.unfinished { await deliver(result, owner: owner) }
-        if includeHistory {
-            var checked = 0
-            for await result in Transaction.all {
-                guard current(owner), !Task.isCancelled else { return }
-                await deliver(result, owner: owner)
-                checked += 1
-                if checked >= 100 { break }
-            }
-        }
+        message = nil
+        var unfinished = Transaction.unfinished.makeAsyncIterator()
+        guard await ApplePurchaseRecovery.check(
+            recoverSavedOrders: { await self.recoverRecordedOrders(owner: owner) },
+            nextUnfinished: { await unfinished.next() },
+            isCurrent: { self.current(owner) },
+            deliver: { _ = await self.deliver($0, owner: owner) }
+        ) else { return }
         if current(owner) {
             pending = (try? attempts().contains { $0.accountID == owner.accountID && !$0.canResumeCheckout }) ?? true
             if message == nil { message = pending ? "Your purchase is still being checked. You can return later." : "Your purchases are up to date." }
@@ -250,7 +249,7 @@ final class AppleMinutePurchases {
             let owner = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
             recentPurchases = [1, 2, 10].map { quantity in
                 RecentPurchase(id: UInt64(quantity), accountID: owner, name: "Small pack", quantity: quantity,
-                    date: Date(timeIntervalSince1970: 1_790_400_000), refunded: quantity == 1)
+                    date: Date(timeIntervalSince1970: 1_790_400_000), refunded: quantity == 1, testPurchase: true)
             }
             return
         }
@@ -273,7 +272,8 @@ final class AppleMinutePurchases {
                 let name = transaction.productID.contains(".small.") ? "Small pack" : transaction.productID.contains(".medium.") ? "Medium pack" : "Large pack"
                 recentPurchases.append(RecentPurchase(id: transaction.id, accountID: owner.accountID, name: name,
                     quantity: transaction.purchasedQuantity, date: transaction.purchaseDate,
-                    refunded: transaction.revocationDate != nil || (status.reversedNanoUSD.map { $0 != "0" } ?? false)))
+                    refunded: transaction.revocationDate != nil || (status.reversedNanoUSD.map { $0 != "0" } ?? false),
+                    testPurchase: transaction.environment == .sandbox))
             } catch { historyMessage = "Some purchases couldn’t be checked. Pull down to retry." }
         }
     }
@@ -288,7 +288,7 @@ final class AppleMinutePurchases {
                 // callback was missed. Unfinished transactions can still be finished later.
                 try remove(account: owner.accountID, order: orderID)
                 pending = try attempts().contains { $0.accountID == owner.accountID && !$0.canResumeCheckout }
-                message = "Your minutes have been updated."; balanceRevision += 1
+                message = ApplePurchaseScope.completionMessage(testPurchase: testPurchases); balanceRevision += 1
             } catch {
                 // A failed lookup or pending order must retain its checkout lock.
             }
@@ -320,7 +320,7 @@ final class AppleMinutePurchases {
             try remove(account: owner.accountID, order: orderID)
             if current(owner) {
                 pending = try attempts().contains { $0.accountID == owner.accountID && !$0.canResumeCheckout }
-                message = "Your minutes have been updated."; balanceRevision += 1
+                message = ApplePurchaseScope.completionMessage(testPurchase: testPurchases); balanceRevision += 1
             }
             return true
         } catch {
