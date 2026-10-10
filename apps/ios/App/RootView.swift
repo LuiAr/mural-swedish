@@ -117,6 +117,8 @@ struct TalkView: View {
     @State private var typing = false
     @State private var conversationChoice = false
     @State private var openAccountAfterContinuation = false
+    @State private var resumeAfterChoice = false
+    @State private var pinyinExpanded = true
     @State private var transcript: SessionRecord?
     @State private var lookup: WordLookup?
     init(coordinator: ConversationCoordinator) {
@@ -145,31 +147,41 @@ struct TalkView: View {
         .onChange(of: coordinator.hasContinuation, initial: true) { _, waiting in
             if waiting && !coordinator.isRunning { conversationChoice = true }
         }
+        .onChange(of: coordinator.isPaused, initial: true) { _, paused in
+            if paused && coordinator.error == nil { conversationChoice = true }
+        }
         .sheet(isPresented: $conversationChoice, onDismiss: {
             if openAccountAfterContinuation {
                 openAccountAfterContinuation = false
                 coordinator.requestAccountFocus = true; coordinator.showSettings = true
+            } else if resumeAfterChoice {
+                resumeAfterChoice = false
+                coordinator.start()
             }
         }) {
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text(coordinator.notice ?? "Your conversation is saved. You can continue when your minutes finish updating.")
+                        Text(coordinator.isPaused
+                             ? (coordinator.pauseClosureConfirmed
+                                ? "Your conversation is saved on this phone. Voice billing has stopped. Resume when you’re ready, or start a new conversation."
+                                : "Your conversation is saved and the connection is closed. Final voice usage is unconfirmed. You can resume when you’re ready.")
+                             : coordinator.notice ?? "Your conversation is saved. You can continue when your minutes finish updating.")
                             .font(.body).foregroundStyle(MuralColor.secondary)
                         Button {
                             if coordinator.continuationNeedsMinutes { openAccountAfterContinuation = true; conversationChoice = false }
-                            else { conversationChoice = false; coordinator.start() }
+                            else { resumeAfterChoice = true; conversationChoice = false }
                         } label: {
-                            Text(coordinator.continuationNeedsMinutes ? "Add minutes" : "Continue conversation").frame(maxWidth: .infinity, minHeight: 52)
+                            Text(coordinator.isPaused ? "Resume conversation" : coordinator.continuationNeedsMinutes ? "Add minutes" : "Continue conversation").frame(maxWidth: .infinity, minHeight: 52)
                         }
                         .buttonStyle(.borderedProminent).tint(MuralColor.orange).foregroundStyle(MuralColor.ink)
-                        .disabled(!coordinator.continuationReady && !coordinator.continuationNeedsMinutes)
-                        .accessibilityIdentifier(coordinator.continuationNeedsMinutes ? "continuation-add-minutes" : "continue-conversation")
+                        .disabled(!coordinator.isPaused && !coordinator.continuationReady && !coordinator.continuationNeedsMinutes)
+                        .accessibilityIdentifier(coordinator.isPaused ? "resume-conversation" : coordinator.continuationNeedsMinutes ? "continuation-add-minutes" : "continue-conversation")
                         Button("New conversation") { conversationChoice = false; coordinator.resetConversation() }
                             .frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("new-conversation")
                     }.padding(24)
                 }.background(MuralColor.cream)
-                    .navigationTitle("Continue practicing").navigationBarTitleDisplayMode(.inline)
+                    .navigationTitle(coordinator.isPaused ? "Conversation paused" : "Continue practicing").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { conversationChoice = false } } }
             }
             .tint(MuralColor.ink).presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
@@ -182,17 +194,43 @@ struct TalkView: View {
         .sheet(item: $lookup) { item in LookupView(item: item, coordinator: coordinator) }
     }
     private func talkContent(scrollPage: Bool, compact: Bool) -> some View {
-        let hasLongPassage = coordinator.assistantPassage != nil &&
-            (coordinator.caption.count > 60 || coordinator.language.id == "zh")
-        let orbSide: CGFloat = scrollPage ? 170 : compact ? (hasLongPassage ? 124 : 150) : (hasLongPassage ? 156 : 220)
         return VStack(spacing: 0) {
             Text(coordinator.selectedTheme?.title ?? coordinator.language.talkTitle)
                 .font(.system(.caption, design: .rounded, weight: .medium)).foregroundStyle(MuralColor.secondary)
                 .padding(.horizontal, 14).padding(.vertical, compact ? 6 : 9)
                 .background(MuralColor.butter.opacity(0.58), in: Capsule()).padding(.top, 12)
             Spacer(minLength: compact ? 4 : 8)
+            if scrollPage {
+                conversationContent(orbSide: 112, compact: true, scrollCaptions: false)
+            } else {
+                // Fit the actual wrapped source, meaning and optional pinyin, not a character count.
+                ViewThatFits(in: .vertical) {
+                    conversationContent(orbSide: compact ? 150 : 220, compact: compact, scrollCaptions: false)
+                    conversationContent(orbSide: compact ? 124 : 156, compact: true, scrollCaptions: false)
+                    conversationContent(orbSide: 112, compact: true, scrollCaptions: false)
+                    conversationContent(orbSide: 92, compact: true, scrollCaptions: true)
+                }.frame(maxHeight: .infinity)
+            }
+            controls.padding(.top, compact ? 8 : 12).fixedSize(horizontal: false, vertical: true)
+            Group {
+                let actionLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 24))
+                actionLayout {
+                    if coordinator.state == .active {
+                        Button("Type instead", systemImage: "keyboard") { typing = true }
+                        Button("A little help", systemImage: "sparkles") { coordinator.help() }
+                    } else if coordinator.conversationProvider == .personalKey && !coordinator.isRunning {
+                        OpenAIBalanceLink().foregroundStyle(MuralColor.secondary)
+                    }
+                }.font(.caption)
+            }.frame(minHeight: compact ? 28 : 42).fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(coordinator.state != .active && coordinator.session == nil && coordinator.conversationProvider != .personalKey)
+        }.padding(.horizontal, 30).frame(maxWidth: .infinity)
+    }
+    private func conversationContent(orbSide: CGFloat, compact: Bool, scrollCaptions: Bool) -> some View {
+        VStack(spacing: 0) {
             MuralOrb(energy: max(coordinator.outputLevel, coordinator.inputLevel * 0.45), listening: coordinator.state == .active && !coordinator.isMuted, active: coordinator.state != .closing)
-                .frame(width: orbSide, height: orbSide).padding(.vertical, compact ? 2 : 8)
+                .frame(width: orbSide, height: orbSide).accessibilityIdentifier("talk-orb")
+                .padding(.vertical, compact ? 2 : 8)
             VStack(spacing: 2) {
                 if coordinator.state == .active, let seconds = coordinator.inactivitySeconds {
                     Text("Ending in \(seconds)s").fontWeight(.medium).monospacedDigit()
@@ -204,39 +242,26 @@ struct TalkView: View {
             .padding(.top, 6).padding(.bottom, compact ? 8 : 16)
             .accessibilityElement(children: .ignore).accessibilityLabel(coordinator.status)
             .accessibilityAddTraits([.isStaticText, .updatesFrequently]).accessibilityIdentifier("conversation-status")
-            captionArea(scrollPage: scrollPage)
-                .frame(maxHeight: scrollPage ? nil : .infinity)
-            controls.padding(.top, compact ? 8 : 12)
-            Group {
-                let actionLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 24))
-                actionLayout {
-                    if coordinator.state == .active {
-                        Button("Type instead", systemImage: "keyboard") { typing = true }
-                        Button("A little help", systemImage: "sparkles") { coordinator.help() }
-                    }
-                }.font(.caption)
-            }.frame(minHeight: compact ? 28 : 42).accessibilityHidden(coordinator.state != .active && coordinator.session == nil)
-        }.padding(.horizontal, 30).frame(maxWidth: .infinity)
+            if coordinator.estimatedVoiceCostUSD != nil {
+                CallCostIndicator(coordinator: coordinator).padding(.bottom, compact ? 4 : 8)
+            }
+            if scrollCaptions {
+                scrollingPassage { captionArea }
+                    .id(coordinator.assistantPassage?.id)
+                    .accessibilityIdentifier("conversation-passage-scroll")
+            } else { captionArea.frame(maxHeight: .infinity) }
+        }
     }
-    private func captionArea(scrollPage: Bool) -> some View {
+    private var captionArea: some View {
         VStack(spacing: 12) {
-            if coordinator.assistantPassage == nil && !scrollPage {
-                VStack(spacing: 14) {
-                    targetPassage
-                    if coordinator.store.preferences.meaningVisible { meaningPassage }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                if scrollPage { targetPassage }
-                else { scrollingPassage { targetPassage }.frame(maxHeight: .infinity).accessibilityIdentifier("target-passage-scroll") }
-                if coordinator.store.preferences.meaningVisible {
-                    if scrollPage { meaningPassage }
-                    else { scrollingPassage { meaningPassage }.frame(maxHeight: .infinity).accessibilityIdentifier("meaning-passage-scroll") }
-                }
+            VStack(spacing: coordinator.assistantPassage == nil ? 14 : 12) {
+                targetPassage
+                if coordinator.store.preferences.meaningVisible { meaningPassage }
             }
             if let user = coordinator.userPassage {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("YOU").font(.system(.caption2, design: .rounded, weight: .medium))
-                    Text(String(user.text.suffix(160))).font(.caption).lineLimit(1)
+                    Text(user.text).font(.caption).accessibilityIdentifier("user-caption")
                 }.foregroundStyle(MuralColor.secondary).multilineTextAlignment(.center).padding(.top, 3)
             }
             if coordinator.working { ProgressView("Checking that for you…").font(.caption).tint(MuralColor.secondary) }
@@ -251,7 +276,8 @@ struct TalkView: View {
             if let notice = coordinator.notice, !coordinator.hasContinuation {
                 Text(notice).font(.footnote).foregroundStyle(MuralColor.secondary).multilineTextAlignment(.center)
             }
-        }.frame(minHeight: typeSize.isAccessibilitySize ? 100 : 105).frame(maxWidth: .infinity)
+        }.fixedSize(horizontal: false, vertical: true)
+            .frame(minHeight: typeSize.isAccessibilitySize ? 100 : 105).frame(maxWidth: .infinity)
     }
     private var targetPassage: some View {
         VStack(spacing: 8) {
@@ -261,7 +287,7 @@ struct TalkView: View {
                     guard url.scheme == "mural-word", let components = URLComponents(url: url, resolvingAgainstBaseURL: false), let word = components.queryItems?.first?.value else { return .discarded }
                     lookup = WordLookup(word: word, sentence: coordinator.caption); return .handled
                 }).accessibilityIdentifier("target-caption")
-            if coordinator.language.id == "zh" { PinyinHelp(text: coordinator.caption) }
+            if coordinator.language.id == "zh" { PinyinHelp(text: coordinator.caption, expanded: $pinyinExpanded) }
         }.frame(maxWidth: .infinity)
     }
     private var meaningPassage: some View {
@@ -281,7 +307,7 @@ struct TalkView: View {
         GeometryReader { geometry in
             ScrollView {
                 content().frame(maxWidth: .infinity).frame(minHeight: geometry.size.height)
-            }.scrollIndicators(.hidden)
+            }
         }
     }
     private var linkedCaption: AttributedString {
@@ -311,18 +337,20 @@ struct TalkView: View {
                 .accessibilityLabel(coordinator.store.preferences.meaningVisible ? "Hide meaning subtitles" : "Show meaning subtitles")
                 .accessibilityValue(coordinator.store.preferences.meaningVisible ? "On" : "Off")
             Button {
-                if coordinator.state == .active { coordinator.toggleMute() }
-                else if coordinator.hasContinuation { conversationChoice = true }
+                if coordinator.canPause { coordinator.pauseConversation() }
+                else if coordinator.state == .active { coordinator.toggleMute() }
+                else if coordinator.hasContinuation || coordinator.isPaused { conversationChoice = true }
                 else if !coordinator.isRunning { coordinator.start() }
             } label: {
                 ZStack {
                     Circle().fill(LinearGradient(colors: [Color(red: 1, green: 0.73, blue: 0.48), MuralColor.orange], startPoint: .topLeading, endPoint: .bottomTrailing))
                     if coordinator.state == .connecting || coordinator.state == .closing { ProgressView().tint(MuralColor.ink) }
-                    else { Image(systemName: coordinator.isMuted && coordinator.state == .active ? "mic.slash" : "mic").font(.system(size: 28, weight: .regular)).contentTransition(.symbolEffect(.replace)) }
+                    else { Image(systemName: coordinator.isPaused ? "play.fill" : coordinator.canPause ? "pause.fill" : coordinator.isMuted && coordinator.state == .active ? "mic.slash" : "mic").font(.system(size: 28, weight: .regular)).contentTransition(.symbolEffect(.replace)) }
                 }.frame(width: 76, height: 76).shadow(color: MuralColor.orange.opacity(0.25), radius: 10, y: 6)
             }.buttonStyle(.plain).padding(.bottom, typeSize.isAccessibilitySize ? 0 : 18)
                 .disabled(coordinator.state == .connecting || coordinator.state == .closing)
-                .accessibilityLabel(coordinator.state == .active ? (coordinator.isMuted ? "Unmute microphone" : "Mute microphone") : "Start conversation")
+                .accessibilityLabel(coordinator.isPaused ? "Resume conversation" : coordinator.canPause ? "Pause conversation" : coordinator.state == .active ? (coordinator.isMuted ? "Unmute microphone" : "Mute microphone") : "Start conversation")
+                .accessibilityHint(coordinator.canPause ? "Closes the voice connection and saves this conversation for later" : "")
                 .accessibilityIdentifier("start-conversation")
             Button { if coordinator.isRunning { coordinator.end() } else { transcript = coordinator.session } } label: {
                 labelLayout {

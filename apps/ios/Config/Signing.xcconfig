@@ -1,3 +1,6 @@
 // The optional file keeps personal signing settings out of the public project.
 #include "ManagedAccounts.xcconfig"
+// Release signing. Local.xcconfig can override these for a personal build.
+DEVELOPMENT_TEAM = 8PZYNMS6FH
+MURAL_BUNDLE_IDENTIFIER = chat.mural.ios
 #include? "Local.xcconfig"

@@ -39,7 +39,7 @@ Both paths remain ignored by Git. If both files exist, compare them privately an
 
 1. Download the [Swedish branch ZIP](https://github.com/LuiAr/mural-swedish/archive/refs/heads/codex/add-swedish.zip) and extract it, or run `git clone --branch codex/add-swedish https://github.com/LuiAr/mural-swedish.git` to clone [this personal fork](https://github.com/LuiAr/mural-swedish/tree/codex/add-swedish). Open `apps/ios/Mural.xcodeproj`. Allow Xcode to resolve the pinned WebRTC package. The [Claude handoff prompt](claude-handoff.md) covers the remaining Mac and device checks.
 2. Select the blue **Mural** project in the navigator. Under **Targets**, choose **Mural**, then open **Signing & Capabilities**.
-3. Enable **Automatically manage signing** and choose your Apple team. For a fork, set a unique bundle identifier, such as `com.yourname.mural`. Do not change an existing installation’s identifier when refreshing it.
+3. Enable **Automatically manage signing**. To keep your team and identifier out of the shared project, copy `apps/ios/Config/Local.example.xcconfig` to `apps/ios/Config/Local.xcconfig` if that file does not exist yet (otherwise edit the existing file), and set `DEVELOPMENT_TEAM` and a unique `MURAL_BUNDLE_IDENTIFIER`, such as `com.yourname.mural`. A free Personal Team also needs that file’s Sign in with Apple lines. Confirm Xcode shows your team and identifier. Do not change an existing installation’s identifier when refreshing it.
 4. Connect the iPhone, unlock it, and accept **Trust This Computer** if shown. In Xcode’s **Window → Devices and Simulators**, wait for the phone to finish preparing.
 5. On the iPhone, enable **Settings → Privacy & Security → Developer Mode**. Restart and confirm **Turn On** when prompted.
 6. In Xcode’s toolbar, select the **Mural** scheme and your iPhone as the destination. Click **Run** or press **⌘R**. If macOS requests access to the signing key, allow Xcode to use it.
@@ -59,6 +59,7 @@ Use **Settings → Export learning backup** before changing your bundle identifi
 | Problem | Action |
 | --- | --- |
 | Xcode cannot register the bundle identifier | Choose a unique identifier for your fork and reselect your team. |
+| Personal Teams do not support Sign in with Apple | Add the personal-build lines from `Local.example.xcconfig` to `Local.xcconfig`. |
 | The phone does not appear as a destination | Unlock it, check the cable, and open Devices and Simulators to finish pairing. |
 | Developer Mode is missing | Pair with Xcode first, then check Privacy & Security again. |
 | The app will not launch after a week | Refresh the build through Xcode without uninstalling. |

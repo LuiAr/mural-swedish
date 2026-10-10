@@ -54,7 +54,7 @@ After adding or removing files under `apps/ios/App/`, run:
 python3 scripts/generate_project.py
 ```
 
-The generator moves a team selected in Xcode into the ignored `apps/ios/Config/Local.xcconfig`. The public `apps/ios/Config/Signing.xcconfig` includes that file when present. You can also copy `apps/ios/Config/Local.example.xcconfig` to `apps/ios/Config/Local.xcconfig` and enter your team ID there. Keep repeatable project settings in the generator; other manual project edits can be replaced on the next run. Swift Package Manager discovers files under `apps/ios/Core/` automatically.
+The public `apps/ios/Config/Signing.xcconfig` sets the release team and bundle identifier, then includes the ignored `apps/ios/Config/Local.xcconfig` when present. For a personal build, copy `apps/ios/Config/Local.example.xcconfig` to `apps/ios/Config/Local.xcconfig` if it does not exist yet, and set `DEVELOPMENT_TEAM` and `MURAL_BUNDLE_IDENTIFIER` there; the UI-test bundle derives its identifier from the same value. If you choose a team or identifier in Xcode's signing editor instead, the generator moves it into `Local.xcconfig` on its next run. Keep repeatable project settings in the generator; other manual project edits can be replaced on the next run. Swift Package Manager discovers files under `apps/ios/Core/` automatically.
 
 ## Verify live changes
 

@@ -351,6 +351,7 @@ struct SettingsView: View {
                     if coordinator.conversationProvider == .personalKey {
                         Text("No Mural minute limit. OpenAI bills your account for usage.")
                             .font(.footnote).foregroundStyle(MuralColor.secondary)
+                        OpenAIBalanceLink()
                     }
                     if hasKey || coordinator.conversationProvider == .personalKey {
                         Button {

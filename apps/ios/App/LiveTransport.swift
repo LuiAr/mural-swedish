@@ -112,6 +112,7 @@ struct HostedConnectRequest {
                             "store": false, "delegation": ["type": "client"], "audio": ["output": ["voice": "marin"]]],
                 "transport": ["type": "webrtc", "sdp": sdp]
             ])
+            guard attempt == token else { throw CancellationError() }
             guard let transport = result["transport"] as? [String: Any], let received = transport["sdp"] as? String else { throw TransportError.connection }
             answer = received
             if let session = result["session"] as? [String: Any] { onEvent?(["type": "mural.session.created", "session": session]) }

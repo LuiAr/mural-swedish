@@ -1,5 +1,15 @@
 # Build verification
 
+7 October 2026: [OpenAI balance button](ios-balance-button-2026-10-07.md) records the browser link before personal-key calls, in Advanced settings and the cost sheet, passing simulator/signed builds and three native UI checks, owner-confirmed link behavior and iPhone installation.
+
+7 October 2026: [Talk controls and adaptive captions](ios-talk-controls-and-captions-2026-10-07.md) records the main Pause button, naturally wrapped source/meaning/learner text, adaptive orb, shared overflow scrolling, 16 targeted offline UI checks, signed iPhone build and successful installation. Opening the updated app on the phone remains pending unlock.
+
+6 October 2026: [Personal-key Pause and Resume](ios-pause-resume-2026-10-06.md) records the pause checkpoint, transcript/cost continuity, 208 core tests, eight targeted offline UI checks, signed build and iPhone installation.
+
+6 October 2026: [Personal-key call cost](ios-call-cost-2026-10-06.md) records the voice estimate, 202 core tests, four targeted offline UI checks, and signed iPhone build.
+
+6 October 2026: [iOS build follow-up](ios-build-2026-10-06.md) records successful simulator and signed iPhone builds, 197 Swift and 78 Python tests, four targeted UI checks, and the iOS 27 pinyin-toggle fix.
+
 11 September 2026
 
 - iOS simulator build succeeded with Xcode 26.4.1.
