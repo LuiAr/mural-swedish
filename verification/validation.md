@@ -1,5 +1,7 @@
 # Build verification
 
+15 October 2026: [Hosted closeout source integration](backend-closeout-2026-10-15.md) records upstream PR #168, preserved Swedish and personal-key configuration, the account-load fixture cleanup fix, offline checks and PostgreSQL CI evidence. This backend source update does not require an app install or deployment for the owner's disabled hosted path.
+
 10 October 2026: [Visible installed build number](ios-build-number-2026-10-10.md) records Version/Build in About Mural, passing simulator and signed iPhone builds, inspected offline native UI and verified installation of build 6. No live call or backend deployment was used.
 
 10 October 2026: [Main merge and personal iPhone delivery](ios-main-release-2026-10-10.md) records merged PR #2, the signed build from main, successful installation and on-device readback of Mural 1.0 (5). No app launch, live call or backend deployment was required.

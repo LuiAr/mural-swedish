@@ -56,3 +56,11 @@ The Checks, Contracts and Android GitHub workflows support manual `workflow_disp
 ## Installed iOS build identification
 
 Settings → About Mural shows Version and Build from the running app’s `CFBundleShortVersionString` and `CFBundleVersion`; never hardcode the displayed build. Keep `CURRENT_PROJECT_VERSION` aligned in the Xcode project and `scripts/generate_project.py`, and read back the installed version after a phone update. This display is local and needs no server deployment.
+
+## Hosted closeout evidence and monitoring
+
+Upstream PR #168 adds immutable final voice usage evidence and durable reconciliation health. Preserve the Swedish `sv-SE` provider entry when integrating upstream backend changes. A source integration does not enable hosted accounts, sign-in, purchases or managed API access in the owner's personal-key app, and needs no deployment for that app's disabled hosted path.
+
+For an authorized hosted server deployment, apply migration `035_closeout_evidence_and_health.sql` and `operations/closeout-evidence-runtime-grants.sql` before starting the new API. Enable monitor `reconciliationHealth` only on migrated targets, preserving existing mail configuration, monitor state, balances and unresolved holds. Replay verified final usage through normal settlement; transport loss, command rejection and elapsed time do not establish final billing. Follow the existing backup, active-call, rollback and deployment verification requirements.
+
+The API's ten-thousand-account sign-in test cleans up synthetic accounts in batches of 250. Upstream post-merge CI timed out on the single bulk cleanup statement after the sign-in assertions passed. Keep the full account-load assertions and the normal database statement timeout; do not weaken them to accommodate fixture cleanup.
