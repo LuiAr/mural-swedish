@@ -4,6 +4,12 @@
 
 At the start of each Mural coding task, fetch `origin/main` and base new branch work on that revision. Before opening a PR or marking one ready for review, fetch `origin/main` again, integrate any new commits into the working branch, resolve conflicts, and run the affected checks. Check once more for a newer `main` before merging. Preserve uncommitted and untracked work when updating a checkout; use an isolated worktree when that work would be at risk.
 
+## Personal iPhone delivery after updates
+
+After finishing an authorized Mural update, attempt a signed iPhone build and install it over the owner's existing app by default, including backend-only source updates, unless the user says otherwise. Preserve the existing bundle identifier, signing team, personal-key settings, learning data and Keychain; never uninstall or reset to refresh a build. Increment the delivery build number in both the Xcode project and generator, and read back the installed version and build from the physical phone. If the phone, pairing or signing is unavailable, finish the build where possible and report the exact remaining step. This default authorizes build and installation, not launching the app, starting voice calls, making purchases or other billable checks.
+
+A sandboxed `codesign --verify --deep --strict` can fail with `CSSMERR_TP_NOT_TRUSTED` when macOS trust-store access is unavailable. Retry with the required trust access and confirm successful verification; do not bypass signature checks or treat the sandbox result alone as an invalid signing certificate.
+
 ## Keep Talk minimal
 
 William reaffirmed on September 28, 2026 that Talk should retain its original minimal layout. Put funding-boundary explanations and Continue/New conversation choices together in one native sheet, not inline on the home screen. Dismissal must preserve the conversation; the microphone can reopen the pending choice. Use the existing orange primary action and native platform patterns. Avoid additional splash/logo stages before Android's animated Talk orb.
