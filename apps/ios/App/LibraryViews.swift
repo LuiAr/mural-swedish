@@ -839,6 +839,7 @@ private struct FlashcardView: View {
     }
     private func reveal() {
         guard canReveal() else { return }
+        coordinator.pronunciation.stop()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.48)) { revealed.toggle() }
     }
 }

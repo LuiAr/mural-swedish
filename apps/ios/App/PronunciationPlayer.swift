@@ -63,6 +63,7 @@ import MuralCore
     }
 
     func stop() {
+        error = nil; errorID = nil
         previewTask?.cancel(); previewTask = nil
         utterance = nil; activeID = nil
         synthesizer.stopSpeaking(at: .immediate)
