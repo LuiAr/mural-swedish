@@ -308,6 +308,11 @@ final class MuralUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Flashcard did not reach \(value)", file: file, line: line)
     }
 
+    private func waitForLabel(_ value: String, in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", value), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Label did not update to \(value)", file: file, line: line)
+    }
+
     private func confirmAdult(in app: XCUIApplication) {
         let control = app.switches["onboarding-adult-confirmation"]
         XCTAssertTrue(control.exists)
@@ -1444,6 +1449,41 @@ final class MuralUITests: XCTestCase {
         }
     }
 
+    func testConversationRecapRetryKeepsOriginalTranscript() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--preview-key", "--screenshot=words", "--preview-swedish-study", "--preview-recap", "--preview-pronunciation"]
+        app.launch()
+        let history = app.buttons["open-session-history"]
+        XCTAssertTrue(history.waitForExistence(timeout: 10))
+        reveal(history, in: app)
+        history.tap()
+        let session = app.buttons["history-session"].firstMatch
+        XCTAssertTrue(session.waitForExistence(timeout: 5))
+        session.tap()
+        app.buttons["open-conversation-recap"].tap()
+        app.buttons["generate-recap"].tap()
+        let original = app.staticTexts["recap-original"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5))
+        XCTAssertEqual(original.label, "Jag läser en bok igår.")
+        XCTAssertEqual(app.staticTexts["recap-suggestion"].label, "Jag läste en bok igår.")
+        let tryAgain = app.buttons["recap-try-again"]
+        reveal(tryAgain, in: app)
+        tryAgain.tap()
+        XCTAssertFalse(app.staticTexts["recap-suggestion"].exists)
+        let answer = app.descendants(matching: .any)["recap-practice-answer"].firstMatch
+        answer.tap(); answer.typeText("Jag läste en bok igår.")
+        let compare = app.buttons["recap-reveal-answer"]
+        reveal(compare, in: app)
+        compare.tap()
+        XCTAssertTrue(app.staticTexts["recap-suggestion"].waitForExistence(timeout: 3))
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish conversation recap"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["close-recap"].tap()
+        XCTAssertEqual(app.staticTexts["transcript-user-passage"].label, "Jag läser en bok igår.")
+        app.buttons["open-conversation-recap"].tap()
+        XCTAssertTrue(app.staticTexts["recap-suggestion"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["generate-recap"].exists)
+    }
+
     func testDailyReviewSavesGradesAndResumesRemainingWords() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
@@ -1454,21 +1494,22 @@ final class MuralUITests: XCTestCase {
         open.tap()
         XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
-        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "1 of 4 · Up to five minutes")
+        waitForLabel("1 of 4 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
         app.buttons["daily-review-reveal"].tap()
         XCTAssertTrue(app.staticTexts["daily-review-answer"].exists)
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Daily vocabulary review"; capture.lifetime = .keepAlways; add(capture)
         app.buttons["daily-review-remembered"].tap()
-        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "2 of 4 · Up to five minutes")
+        waitForLabel("2 of 4 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
         XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
         app.buttons["close-daily-review"].tap()
         if !open.isHittable { app.swipeUp() }
         open.tap()
         XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "1 of 3 · Up to five minutes")
+        waitForLabel("1 of 3 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
         app.buttons["daily-review-reveal"].tap()
         app.buttons["daily-review-needs-practice"].tap()
         app.buttons["close-daily-review"].tap()
-        XCTAssertEqual(open.label, "Daily review · 2 words")
+        waitForLabel("Daily review · 2 words", in: open)
     }
 
     func testVocabularyPlaybackAndSavedExample() {
@@ -1493,6 +1534,7 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(exampleListen.isHittable)
         exampleListen.tap()
         XCTAssertEqual(exampleListen.label, "Stop pronunciation")
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Word and example listening"; capture.lifetime = .keepAlways; add(capture)
         app.buttons["close-flashcards"].tap()
         app.buttons["open-flashcards"].tap()
         XCTAssertEqual(app.buttons["flashcard-word-pronunciation-play"].label, "Hear pronunciation")

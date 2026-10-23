@@ -190,6 +190,9 @@ import MuralCore
         })
     }
     var isRunning: Bool { state == .active || state == .connecting || state == .closing }
+    func refreshStudySession(_ id: UUID) {
+        if session?.id == id, !isRunning, let saved = store.sessions.first(where: { $0.id == id }) { session = saved }
+    }
     var language: LanguageModule { store.language }
     var assistantPassage: Passage? { session?.passages.last(where: { $0.speaker == .assistant }) }
     var userPassage: Passage? { session?.passages.last(where: { $0.speaker == .user }) }

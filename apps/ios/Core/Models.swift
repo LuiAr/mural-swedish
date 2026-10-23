@@ -162,6 +162,7 @@ public struct SessionRecord: Codable, Identifiable, Sendable {
     public var outputTokens = 0
     public var searchCalls = 0
     public var endReason: String?
+    public var recap: ConversationRecap?
     public init(languageID: String = LanguageRegistry.defaultID, themeID: String? = nil, title: String? = nil) {
         self.languageID = languageID; self.themeID = themeID
         self.title = title ?? LanguageRegistry.module(for: languageID)?.defaultTitle ?? "A conversation"
@@ -178,6 +179,7 @@ public struct SessionRecord: Codable, Identifiable, Sendable {
     public mutating func invalidateChangedAssessments() {
         let current = Dictionary(uniqueKeysWithValues: passages.map { ($0.id, $0.revisionKey) })
         assessments.removeAll { current[$0.passageID] != $0.revisionKey }
+        if let recap, !recap.isValid(for: self) { self.recap = nil }
     }
     public mutating func correctFragment(id: String, text: String) {
         guard let index = fragments.firstIndex(where: { $0.id == id }) else { return }
@@ -250,6 +252,15 @@ public struct Archive: Codable, Sendable {
             session.assessments = session.assessments.compactMap { LearningEngine.validate($0, session: session) }
             candidate.sessions.append(session)
         }
+        // A backup may add newer study material for an existing conversation,
+        // but must never replace that conversation's source or learning evidence.
+        for session in incoming.sessions {
+            guard let recap = session.recap,
+                  let index = candidate.sessions.firstIndex(where: { $0.id == session.id }),
+                  recap.isValid(for: candidate.sessions[index]),
+                  candidate.sessions[index].recap.map({ $0.createdAt < recap.createdAt }) ?? true else { continue }
+            candidate.sessions[index].recap = recap
+        }
         var reviews = Dictionary((wordReviews ?? []).map { ($0.wordID, $0) }, uniquingKeysWith: { first, _ in first })
         for review in incoming.wordReviews ?? [] where reviews[review.wordID].map({ $0.reviewedAt < review.reviewedAt }) ?? true {
             reviews[review.wordID] = review
@@ -290,6 +301,7 @@ public struct Archive: Codable, Sendable {
                   s.fragments.allSatisfy({ $0.startMS >= 0 && $0.endMS >= $0.startMS && $0.text.count <= 50_000 &&
                       (0...1_000_000).contains($0.revision) && validDate($0.receivedAt) }),
                   s.topics.allSatisfy({ $0.languageID == s.languageID && validDate($0.retrievedAt) }) else { throw ArchiveError.invalid }
+            guard s.recap.map({ $0.isValid(for: s) }) ?? true else { throw ArchiveError.invalid }
         }
     }
     /// Version 1 was Norwegian-only. Migration assigns that provenance once;

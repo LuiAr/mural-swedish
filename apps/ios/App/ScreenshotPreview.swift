@@ -13,6 +13,25 @@ import MuralCore
     }
     static var tab: Int { screen == .themes ? 1 : screen == .words ? 2 : 0 }
 
+    static func seedSwedishStudy(_ store: LearningStore) {
+        store.selectLanguage("sv")
+        store.updatePreferences { $0.hasOnboarded = true; $0.meaningLanguage = "English"; $0.aiConsentVersion = AIProcessingConsent.version }
+        let date = Date().addingTimeInterval(-600)
+        var record = SessionRecord(languageID: "sv", title: "Swedish practice")
+        record.startedAt = date; record.endedAt = date.addingTimeInterval(60)
+        record.append(Fragment(id: "swedish-study-user", speaker: .user, text: "Jag läser en bok igår.", startMS: 100_000, endMS: 103_000, receivedAt: date))
+        record.append(Fragment(id: "swedish-study-assistant", speaker: .assistant, text: "Du läste en bok igår. Vad handlade den om?", startMS: 104_000, endMS: 108_000, receivedAt: date))
+        let passage = record.passages[0]
+        record.assessments = [Assessment(passageID: passage.id, revisionKey: passage.revisionKey, outcome: .partial,
+            suggestedLevel: 1, nextGoal: "Use the past tense for yesterday", capability: "", words: [
+                WordProposal(lemma: "en bok", meaning: "book", form: "bok", kind: .independent, confidence: 0.95,
+                             sourceIDs: passage.fragments.map(\.id), quote: passage.text, language: "sv"),
+                WordProposal(lemma: "att läsa", meaning: "to read", form: "läser", kind: .independent, confidence: 0.95,
+                             sourceIDs: passage.fragments.map(\.id), quote: passage.text, language: "sv")
+            ], createdAt: date)]
+        store.save(record)
+    }
+
     static func seedWords(_ store: LearningStore) {
         let samples: [(lemma: String, meaning: String, form: String, quote: String, days: [Int])] = [
             ("me apetece", "I feel like", "me apetece", "Hoy me apetece tomar un café.", [9, 4, 0]),

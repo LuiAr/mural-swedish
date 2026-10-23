@@ -72,9 +72,29 @@ import MuralCore
     }
     func updatePreferences(_ change: (inout Preferences) -> Void) { change(&archive.preferences); persist() }
     func save(_ session: SessionRecord) {
+        var session = session
+        session.invalidateChangedAssessments()
         if let i = archive.sessions.firstIndex(where: { $0.id == session.id }) { archive.sessions[i] = session }
         else { archive.sessions.append(session) }
         persist()
+    }
+    /// Merge study material into the latest record so late assessments survive.
+    /// Failed persistence restores both the visible archive and stored payload.
+    @discardableResult func saveRecap(_ recap: ConversationRecap, inputTokens: Int = 0, outputTokens: Int = 0) -> Bool {
+        guard let index = archive.sessions.firstIndex(where: { $0.id == recap.sessionID }),
+              recap.isValid(for: archive.sessions[index]),
+              (0...1_000_000_000).contains(inputTokens), (0...1_000_000_000).contains(outputTokens),
+              archive.sessions[index].inputTokens <= 1_000_000_000 - inputTokens,
+              archive.sessions[index].outputTokens <= 1_000_000_000 - outputTokens else { return false }
+        let previous = archive.sessions[index], previousPayload = document.payload
+        archive.sessions[index].recap = recap
+        archive.sessions[index].inputTokens += inputTokens; archive.sessions[index].outputTokens += outputTokens
+        persist()
+        guard error == nil else {
+            archive.sessions[index] = previous; document.payload = previousPayload
+            return false
+        }
+        return true
     }
     func deleteSession(_ id: UUID) { onSessionInvalidation?(id); archive.sessions.removeAll { $0.id == id }; archive.pruneWordReviews(); persist() }
     func hideWord(_ id: String) { archive.preferences.hiddenWords.append(id); archive.pruneWordReviews(); persist() }

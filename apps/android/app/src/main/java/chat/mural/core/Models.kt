@@ -123,13 +123,18 @@ data class SessionRecord(
     var fragments: MutableList<Fragment> = mutableListOf(), var assessments: MutableList<Assessment> = mutableListOf(),
     var translations: MutableMap<String,String> = mutableMapOf(), var topics: MutableList<TopicBrief> = mutableListOf(),
     var voiceSeconds: Double = 0.0, var usageFinal: Boolean = false, var inputTokens: Int = 0,
-    var outputTokens: Int = 0, var searchCalls: Int = 0, var endReason: String? = null
+    var outputTokens: Int = 0, var searchCalls: Int = 0, var endReason: String? = null,
+    var recap: ConversationRecap? = null
 ) {
     val passages get() = Transcript.passages(fragments)
     // Voice captions use the provider timeline, not time since the local connection attempt.
     val nextTypedVoiceOffsetMS get() = (fragments.maxOfOrNull { it.endMS } ?: 0).coerceAtMost(Int.MAX_VALUE - 2) + 1
     fun append(f: Fragment) { if (fragments.none { it.id == f.id }) { fragments += f; invalidateChangedAssessments() } }
-    fun invalidateChangedAssessments() { val current = passages.associate { it.id to it.revisionKey }; assessments.removeAll { current[it.passageID] != it.revisionKey } }
+    fun invalidateChangedAssessments() {
+        val current = passages.associate { it.id to it.revisionKey }
+        assessments.removeAll { current[it.passageID] != it.revisionKey }
+        if (recap?.isValid(this) == false) recap = null
+    }
     fun correctFragment(id: String, text: String) {
         val i = fragments.indexOfFirst { it.id == id }; if (i < 0) return
         val f = fragments[i]; fragments[i] = f.copy(previousTexts = f.previousTexts + f.text, text = text, revision = f.revision + 1)
@@ -193,6 +198,13 @@ object ArchiveCodec {
         adds.forEach { source ->
             val s = source.copy(fragments=source.fragments.toMutableList(), assessments=source.assessments.toMutableList(), translations=source.translations.toMutableMap(), topics=source.topics.toMutableList())
             s.invalidateChangedAssessments(); s.assessments = s.assessments.mapNotNull { LearningEngine.validate(it,s) }.toMutableList(); out.sessions += s
+        }
+        // Existing conversations retain their source and learning evidence.
+        incoming.sessions.forEach { source ->
+            val recap = source.recap
+            val currentSession = out.sessions.firstOrNull { it.id.equals(source.id, ignoreCase = true) }
+            if (recap != null && currentSession != null && recap.isValid(currentSession) &&
+                currentSession.recap?.let { it.createdAt < recap.createdAt } != false) currentSession.recap = recap
         }
         val reviews = (current.wordReviews ?: emptyList()).associateBy { it.wordID.canonical() }.toMutableMap()
         (incoming.wordReviews ?: emptyList()).forEach { review ->
@@ -263,6 +275,7 @@ object ArchiveCodec {
             if (!validUUID(s.id) || !s.voiceSeconds.isFinite() || s.voiceSeconds !in 0.0..31536000.0 || listOf(s.inputTokens,s.outputTokens,s.searchCalls).any { it !in 0..1_000_000_000 } || !validDate(s.startedAt) || s.endedAt?.let { !validDate(it) } == true) throw ArchiveError.INVALID
             if (s.fragments.map { it.id }.toSet().size != s.fragments.size || s.fragments.any { it.startMS < 0 || it.endMS < it.startMS || it.text.length > 50000 || it.revision !in 0..1_000_000 || !validDate(it.receivedAt) }) throw ArchiveError.INVALID
             if (s.assessments.any { !validDate(it.createdAt) } || s.topics.any { !validUUID(it.id) || it.languageID != s.languageID || !validDate(it.retrievedAt) }) throw ArchiveError.INVALID
+            if (s.recap?.isValid(s) == false) throw ArchiveError.INVALID
         }
     }
 }

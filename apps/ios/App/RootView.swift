@@ -89,6 +89,9 @@ struct RootView: View {
             coordinator.store.updatePreferences { $0.hasOnboarded = true }
         }
         if let screen = ScreenshotPreview.screen { coordinator.prepareScreenshot(screen) }
+        if ProcessInfo.processInfo.arguments.contains("--preview"), ProcessInfo.processInfo.arguments.contains("--preview-swedish-study") {
+            ScreenshotPreview.seedSwedishStudy(coordinator.store)
+        }
         coordinator.prepareTypedReplyPreview()
         coordinator.prepareConversationPolicyPreview()
         coordinator.prepareCaptionFollowingPreview()

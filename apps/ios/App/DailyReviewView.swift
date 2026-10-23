@@ -29,7 +29,7 @@ struct DailyReviewView: View {
                             Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(MuralColor.orange)
                             Text(expired ? "A little practice goes a long way." : "That’s today’s review.")
                                 .font(.system(.title, design: .rounded, weight: .semibold))
-                            Text("\(selection) of \(review.words.count) words reviewed. Your next review is saved.")
+                            Text("\(selection) of \(review.words.count) words reviewed. Completed checks are saved; remaining words are ready next time.")
                                 .accessibilityIdentifier("daily-review-summary")
                             Text("These are your own recall checks. Your spoken-recall bars still come from conversations.")
                                 .font(.footnote).foregroundStyle(MuralColor.secondary)

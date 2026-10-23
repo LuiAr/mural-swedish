@@ -134,18 +134,20 @@ struct WordsView: View {
                                     Spacer(minLength: 10)
                                     VStack(alignment: .trailing, spacing: 8) { RecallBars(count: word.bars); Text(word.label).font(.caption2).foregroundStyle(MuralColor.secondary) }
                                 }.padding(.vertical, 20)
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).accessibilityIdentifier("word-row-" + word.id)
                             Divider().overlay(MuralColor.peach)
                         }
                     }
                 }
-                let dueWords = coordinator.store.dailyReviewWords()
-                Button {
-                    dailyReview = DailyReviewSession(words: dueWords, languageID: coordinator.language.id)
-                } label: {
-                    Label(dueWords.isEmpty ? "You’re caught up for today" : "Daily review · \(dueWords.count) words", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                }.disabled(dueWords.isEmpty).accessibilityIdentifier("open-daily-review")
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    let dueWords = coordinator.store.dailyReviewWords(at: context.date)
+                    Button {
+                        dailyReview = DailyReviewSession(words: dueWords, languageID: coordinator.language.id)
+                    } label: {
+                        Label(dueWords.isEmpty ? "You’re caught up for today" : "Daily review · \(dueWords.count) words", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }.disabled(dueWords.isEmpty).accessibilityIdentifier("open-daily-review")
+                }
                 HStack { Text("1 · Fragile"); Spacer(); Text("2 · Growing"); Spacer(); Text("3 · Steady") }.font(.caption).foregroundStyle(MuralColor.secondary)
                 Text("The bars estimate spoken recall, not permanent mastery. Using a word with visible meanings counts as supported practice.").font(.footnote).foregroundStyle(MuralColor.secondary)
                 if !learner.capabilities.isEmpty {
@@ -156,10 +158,11 @@ struct WordsView: View {
                     }.padding(22).background(MuralColor.butter, in: RoundedRectangle(cornerRadius: 24))
                 }
                 Button("Past conversations", systemImage: "clock.arrow.circlepath") { sessions = true }.font(.subheadline).padding(.vertical, 8)
+                    .accessibilityIdentifier("open-session-history")
             }.padding(26)
         }.foregroundStyle(MuralColor.ink).searchable(text: $search, prompt: "Find a word")
             .sheet(item: $selected) { word in WordDetailView(word: word, coordinator: coordinator) }
-            .sheet(isPresented: $sessions) { SessionHistoryView(store: coordinator.store) }
+            .sheet(isPresented: $sessions) { SessionHistoryView(coordinator: coordinator) }
             .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck, coordinator: coordinator) }
             .sheet(item: $dailyReview) { review in DailyReviewView(review: review, coordinator: coordinator) }
             .onDisappear { coordinator.pronunciation.stop() }
@@ -242,7 +245,8 @@ struct TranscriptView: View {
 }
 
 struct SessionHistoryView: View {
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @State private var selected: SessionRecord?
     @State private var deleting: SessionRecord?
     @Environment(\.dismiss) private var dismiss
@@ -256,12 +260,13 @@ struct SessionHistoryView: View {
                             Text(session.title).font(.headline)
                             Text(session.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(MuralColor.secondary)
                         }.padding(.vertical, 8)
-                    }.swipeActions { Button("Delete", role: .destructive) { deleting = session }.disabled(session.endedAt == nil) }
+                    }.accessibilityIdentifier("history-session")
+                        .swipeActions { Button("Delete", role: .destructive) { deleting = session }.disabled(session.endedAt == nil) }
                 }
             }.scrollContentBackground(.hidden).background(MuralColor.cream)
                 .navigationTitle("Past conversations").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }.sheet(item: $selected) { session in EditableTranscriptView(sessionID: session.id, store: store) }
+        }.sheet(item: $selected) { session in EditableTranscriptView(sessionID: session.id, coordinator: coordinator) }
             .confirmationDialog("Delete this conversation and its learning evidence?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
                 Button("Delete conversation", role: .destructive) { if let deleting { store.deleteSession(deleting.id) }; deleting = nil }
             }
@@ -278,15 +283,21 @@ struct BackupDocument: FileDocument {
 
 struct EditableTranscriptView: View {
     let sessionID: UUID
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @Environment(\.dismiss) private var dismiss
     @State private var editingID: String?
     @State private var editedText = ""
+    @State private var showingRecap = false
     private var session: SessionRecord? { store.sessions.first { $0.id == sessionID } }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    if session?.endedAt != nil {
+                        Button("Review this conversation", systemImage: "text.bubble") { showingRecap = true }
+                            .accessibilityIdentifier("open-conversation-recap")
+                    }
                     ForEach(session?.passages ?? []) { passage in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -315,10 +326,14 @@ struct EditableTranscriptView: View {
                 }.padding(24).background(MuralColor.cream).navigationTitle("What you said").navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editingID = nil } }
-                        ToolbarItem(placement: .confirmationAction) { Button("Save") { if let id = editingID { store.correctPassage(sessionID: sessionID, passageID: id, text: editedText) }; editingID = nil } }
+                        ToolbarItem(placement: .confirmationAction) { Button("Save") {
+                            if let id = editingID { store.correctPassage(sessionID: sessionID, passageID: id, text: editedText); coordinator.refreshStudySession(sessionID) }
+                            editingID = nil
+                        } }
                     }
             }.presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingRecap) { ConversationRecapView(sessionID: sessionID, coordinator: coordinator) }
     }
 }
 
