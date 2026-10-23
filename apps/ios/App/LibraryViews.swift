@@ -94,6 +94,7 @@ struct WordsView: View {
     @State private var selected: WordState?
     @State private var sessions = false
     @State private var flashcards: FlashcardSession?
+    @State private var dailyReview: DailyReviewSession?
     private var learner: LearnerState { coordinator.store.learner }
     private var words: [WordState] { learner.words.filter { search.isEmpty || $0.lemma.localizedCaseInsensitiveContains(search) || $0.meaning.localizedCaseInsensitiveContains(search) } }
     var body: some View {
@@ -138,6 +139,13 @@ struct WordsView: View {
                         }
                     }
                 }
+                let dueWords = coordinator.store.dailyReviewWords()
+                Button {
+                    dailyReview = DailyReviewSession(words: dueWords, languageID: coordinator.language.id)
+                } label: {
+                    Label(dueWords.isEmpty ? "You’re caught up for today" : "Daily review · \(dueWords.count) words", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }.disabled(dueWords.isEmpty).accessibilityIdentifier("open-daily-review")
                 HStack { Text("1 · Fragile"); Spacer(); Text("2 · Growing"); Spacer(); Text("3 · Steady") }.font(.caption).foregroundStyle(MuralColor.secondary)
                 Text("The bars estimate spoken recall, not permanent mastery. Using a word with visible meanings counts as supported practice.").font(.footnote).foregroundStyle(MuralColor.secondary)
                 if !learner.capabilities.isEmpty {
@@ -153,6 +161,7 @@ struct WordsView: View {
             .sheet(item: $selected) { word in WordDetailView(word: word, coordinator: coordinator) }
             .sheet(isPresented: $sessions) { SessionHistoryView(store: coordinator.store) }
             .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck, coordinator: coordinator) }
+            .sheet(item: $dailyReview) { review in DailyReviewView(review: review, coordinator: coordinator) }
             .onDisappear { coordinator.pronunciation.stop() }
             .onChange(of: coordinator.language.id) { _, _ in selected = nil; flashcards = nil; coordinator.pronunciation.stop() }
     }

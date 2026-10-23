@@ -212,12 +212,15 @@ public struct Archive: Codable, Sendable {
     public var schemaVersion = 2
     public var sessions: [SessionRecord] = []
     public var preferences = Preferences()
+    /// Optional additive schema-2 field: older backups have no practice schedule.
+    public var wordReviews: [WordReview]?
     public init() {}
     public static func decode(_ data: Data) throws -> Archive {
         guard data.count <= maximumEncodedBytes else { throw ArchiveError.tooLarge }
         let migrated = try migrate(data)
-        let archive = try JSONDecoder().decode(Archive.self, from: migrated)
+        var archive = try JSONDecoder().decode(Archive.self, from: migrated)
         try archive.validate()
+        archive.pruneWordReviews()
         return archive
     }
     /// Bound the selected file before loading it. The read limit also covers growth after the size check.
@@ -247,15 +250,34 @@ public struct Archive: Codable, Sendable {
             session.assessments = session.assessments.compactMap { LearningEngine.validate($0, session: session) }
             candidate.sessions.append(session)
         }
+        var reviews = Dictionary((wordReviews ?? []).map { ($0.wordID, $0) }, uniquingKeysWith: { first, _ in first })
+        for review in incoming.wordReviews ?? [] where reviews[review.wordID].map({ $0.reviewedAt < review.reviewedAt }) ?? true {
+            reviews[review.wordID] = review
+        }
+        candidate.wordReviews = reviews.isEmpty ? nil : reviews.values.sorted { $0.wordID < $1.wordID }
+        candidate.pruneWordReviews()
         try candidate.validate()
         guard try candidate.encoded().count <= Self.maximumEncodedBytes else { throw ArchiveError.tooLarge }
         return candidate
+    }
+    /// A practice record cannot bring back hidden words or deleted learning evidence.
+    public mutating func pruneWordReviews() {
+        guard let reviews = wordReviews, !reviews.isEmpty else { wordReviews = nil; return }
+        let languages = Set(reviews.map(\.languageID))
+        let available = Set(languages.flatMap { language in
+            LearningEngine.project(sessions, languageID: language, hiddenWords: preferences.hiddenWords).words.map(\.id)
+        })
+        let retained = reviews.filter { available.contains($0.wordID) }
+        wordReviews = retained.isEmpty ? nil : retained
     }
     private func validate() throws {
         guard LanguageRegistry.module(for: preferences.learningLanguageID) != nil else { throw ArchiveError.unsupportedLanguage }
         guard Set(sessions.map(\.id)).count == sessions.count,
               sessions.count <= Self.maximumSessions,
               preferences.sessionMinutes >= 1, preferences.sessionMinutes <= 60 else { throw ArchiveError.invalid }
+        let reviews = wordReviews ?? []
+        guard reviews.count <= 50_000, Set(reviews.map(\.wordID)).count == reviews.count,
+              reviews.allSatisfy(\.isValid) else { throw ArchiveError.invalid }
         func validDate(_ date: Date) -> Bool { date >= .distantPast && date <= .distantFuture }
         for s in sessions {
             guard LanguageRegistry.module(for: s.languageID) != nil else { throw ArchiveError.unsupportedLanguage }

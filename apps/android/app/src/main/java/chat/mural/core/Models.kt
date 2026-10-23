@@ -150,7 +150,15 @@ data class Preferences(
     var meaningLanguage: String = "English", var sessionMinutes: Int = 15, var hiddenWords: List<String> = emptyList(),
     var interests: String = "", var hasOnboarded: Boolean = false, var aiConsentVersion: Int? = null
 )
-@Serializable data class Archive(var schemaVersion: Int = 2, var sessions: MutableList<SessionRecord> = mutableListOf(), var preferences: Preferences = Preferences())
+@Serializable data class Archive(var schemaVersion: Int = 2, var sessions: MutableList<SessionRecord> = mutableListOf(), var preferences: Preferences = Preferences(), var wordReviews: List<WordReview>? = null) {
+    fun pruneWordReviews() {
+        val reviews = wordReviews ?: return
+        val available = reviews.map { it.languageID }.toSet().flatMap { language ->
+            LearningEngine.project(sessions, language, preferences.hiddenWords).words.map { it.id.canonical() }
+        }.toSet()
+        wordReviews = reviews.filter { it.wordID.canonical() in available }.takeIf { it.isNotEmpty() }
+    }
+}
 class ArchiveError private constructor(val kind: Kind) : Exception() {
     enum class Kind { TOO_LARGE, UNSUPPORTED_VERSION, UNSUPPORTED_LANGUAGE, INVALID }
     companion object {
@@ -174,7 +182,7 @@ object ArchiveCodec {
             requireFields(migrated)
             json.decodeFromJsonElement<Archive>(migrated)
         } catch (e: ArchiveError) { throw e } catch (_: Exception) { throw ArchiveError.INVALID }
-        validate(a); return a
+        validate(a); a.pruneWordReviews(); return a
     }
     fun merge(current: Archive, incoming: Archive): Archive {
         validate(incoming)
@@ -186,6 +194,12 @@ object ArchiveCodec {
             val s = source.copy(fragments=source.fragments.toMutableList(), assessments=source.assessments.toMutableList(), translations=source.translations.toMutableMap(), topics=source.topics.toMutableList())
             s.invalidateChangedAssessments(); s.assessments = s.assessments.mapNotNull { LearningEngine.validate(it,s) }.toMutableList(); out.sessions += s
         }
+        val reviews = (current.wordReviews ?: emptyList()).associateBy { it.wordID.canonical() }.toMutableMap()
+        (incoming.wordReviews ?: emptyList()).forEach { review ->
+            if (reviews[review.wordID.canonical()]?.let { it.reviewedAt < review.reviewedAt } != false) reviews[review.wordID.canonical()] = review
+        }
+        out.wordReviews = reviews.values.sortedBy { it.wordID }.takeIf { it.isNotEmpty() }
+        out.pruneWordReviews()
         validate(out); if (encode(out).toByteArray().size > MAXIMUM_ENCODED_BYTES) throw ArchiveError.TOO_LARGE
         return out
     }
@@ -219,6 +233,9 @@ object ArchiveCodec {
         fields(root, "schemaVersion sessions preferences")
         val preferences = root.getValue("preferences").jsonObject
         fields(preferences, "learningLanguageID meaningVisible meaningLanguage sessionMinutes hiddenWords interests hasOnboarded")
+        root["wordReviews"]?.takeIf { it != JsonNull }?.jsonArray?.forEach { value ->
+            fields(value.jsonObject, "wordID languageID reviewedAt dueAt consecutiveRemembered")
+        }
         for (value in root.getValue("sessions").jsonArray) {
             val s = value.jsonObject
             fields(s, "id languageID startedAt title fragments assessments translations topics voiceSeconds usageFinal inputTokens outputTokens searchCalls")
@@ -239,6 +256,8 @@ object ArchiveCodec {
     private fun validate(a: Archive) {
         if (LanguageRegistry.get(a.preferences.learningLanguageID) == null) throw ArchiveError.UNSUPPORTED_LANGUAGE
         if (a.schemaVersion != 2 || a.sessions.size > MAXIMUM_SESSIONS || a.preferences.sessionMinutes !in 1..60 || a.sessions.map { it.id.lowercase() }.toSet().size != a.sessions.size) throw ArchiveError.INVALID
+        val reviews = a.wordReviews ?: emptyList()
+        if (reviews.size > 50_000 || reviews.map { it.wordID.canonical() }.toSet().size != reviews.size || reviews.any { !it.isValid }) throw ArchiveError.INVALID
         a.sessions.forEach { s ->
             if (LanguageRegistry.get(s.languageID) == null) throw ArchiveError.UNSUPPORTED_LANGUAGE
             if (!validUUID(s.id) || !s.voiceSeconds.isFinite() || s.voiceSeconds !in 0.0..31536000.0 || listOf(s.inputTokens,s.outputTokens,s.searchCalls).any { it !in 0..1_000_000_000 } || !validDate(s.startedAt) || s.endedAt?.let { !validDate(it) } == true) throw ArchiveError.INVALID

@@ -34,6 +34,7 @@ jobs:
           -derivedDataPath /tmp/mural-native-checks CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
           -parallel-testing-enabled NO
           -only-testing:MuralUITests/MuralUITests/testVocabularyPlaybackAndSavedExample
+          -only-testing:MuralUITests/MuralUITests/testDailyReviewSavesGradesAndResumesRemainingWords
           -only-testing:MuralUITests/MuralUITests/testFlashcardsRevealNavigateAndIgnoreVerticalSwipes
           -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
           -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test

@@ -1444,6 +1444,33 @@ final class MuralUITests: XCTestCase {
         }
     }
 
+    func testDailyReviewSavesGradesAndResumesRemainingWords() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
+        app.launch()
+        let open = app.buttons["open-daily-review"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        if !open.isHittable { app.swipeUp() }
+        open.tap()
+        XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
+        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "1 of 4 · Up to five minutes")
+        app.buttons["daily-review-reveal"].tap()
+        XCTAssertTrue(app.staticTexts["daily-review-answer"].exists)
+        app.buttons["daily-review-remembered"].tap()
+        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "2 of 4 · Up to five minutes")
+        XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
+        app.buttons["close-daily-review"].tap()
+        if !open.isHittable { app.swipeUp() }
+        open.tap()
+        XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["daily-review-progress"].label, "1 of 3 · Up to five minutes")
+        app.buttons["daily-review-reveal"].tap()
+        app.buttons["daily-review-needs-practice"].tap()
+        app.buttons["close-daily-review"].tap()
+        XCTAssertEqual(open.label, "Daily review · 2 words")
+    }
+
     func testVocabularyPlaybackAndSavedExample() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
