@@ -37,6 +37,7 @@ jobs:
           -only-testing:MuralUITests/MuralUITests/testVocabularyPlaybackAndSavedExample
           -only-testing:MuralUITests/MuralUITests/testDailyReviewSavesGradesAndResumesRemainingWords
           -only-testing:MuralUITests/MuralUITests/testConversationRecapRetryKeepsOriginalTranscript
+          -only-testing:MuralUITests/MuralUITests/testSwedishWordFormsCacheNounsAndVerbs
           -only-testing:MuralUITests/MuralUITests/testFlashcardsRevealNavigateAndIgnoreVerticalSwipes
           -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
           -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test

@@ -216,6 +216,7 @@ public struct Archive: Codable, Sendable {
     public var preferences = Preferences()
     /// Optional additive schema-2 field: older backups have no practice schedule.
     public var wordReviews: [WordReview]?
+    public var swedishWordForms: [SwedishWordForms]?
     public init() {}
     public static func decode(_ data: Data) throws -> Archive {
         guard data.count <= maximumEncodedBytes else { throw ArchiveError.tooLarge }
@@ -223,6 +224,7 @@ public struct Archive: Codable, Sendable {
         var archive = try JSONDecoder().decode(Archive.self, from: migrated)
         try archive.validate()
         archive.pruneWordReviews()
+        archive.pruneSwedishWordForms()
         return archive
     }
     /// Bound the selected file before loading it. The read limit also covers growth after the size check.
@@ -267,6 +269,15 @@ public struct Archive: Codable, Sendable {
         }
         candidate.wordReviews = reviews.isEmpty ? nil : reviews.values.sorted { $0.wordID < $1.wordID }
         candidate.pruneWordReviews()
+        let available = Dictionary(LearningEngine.project(candidate.sessions, languageID: "sv",
+            hiddenWords: candidate.preferences.hiddenWords).words.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var cards: [String: SwedishWordForms] = [:]
+        for card in (swedishWordForms ?? []) + (incoming.swedishWordForms ?? []) {
+            guard let word = available[card.wordID], card.isValid(for: word),
+                  cards[card.wordID].map({ $0.createdAt < card.createdAt }) ?? true else { continue }
+            cards[card.wordID] = card
+        }
+        candidate.swedishWordForms = cards.isEmpty ? nil : cards.values.sorted { $0.wordID < $1.wordID }
         try candidate.validate()
         guard try candidate.encoded().count <= Self.maximumEncodedBytes else { throw ArchiveError.tooLarge }
         return candidate
@@ -281,6 +292,13 @@ public struct Archive: Codable, Sendable {
         let retained = reviews.filter { available.contains($0.wordID) }
         wordReviews = retained.isEmpty ? nil : retained
     }
+    public mutating func pruneSwedishWordForms() {
+        guard let cards = swedishWordForms, !cards.isEmpty else { swedishWordForms = nil; return }
+        let available = Dictionary(LearningEngine.project(sessions, languageID: "sv", hiddenWords: preferences.hiddenWords)
+            .words.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let retained = cards.filter { card in available[card.wordID].map { card.isValid(for: $0) } ?? false }
+        swedishWordForms = retained.isEmpty ? nil : retained
+    }
     private func validate() throws {
         guard LanguageRegistry.module(for: preferences.learningLanguageID) != nil else { throw ArchiveError.unsupportedLanguage }
         guard Set(sessions.map(\.id)).count == sessions.count,
@@ -289,6 +307,9 @@ public struct Archive: Codable, Sendable {
         let reviews = wordReviews ?? []
         guard reviews.count <= 50_000, Set(reviews.map(\.wordID)).count == reviews.count,
               reviews.allSatisfy(\.isValid) else { throw ArchiveError.invalid }
+        let cards = swedishWordForms ?? []
+        guard cards.count <= 50_000, Set(cards.map(\.wordID)).count == cards.count,
+              cards.allSatisfy(\.isWellFormed) else { throw ArchiveError.invalid }
         func validDate(_ date: Date) -> Bool { date >= .distantPast && date <= .distantFuture }
         for s in sessions {
             guard LanguageRegistry.module(for: s.languageID) != nil else { throw ArchiveError.unsupportedLanguage }
@@ -332,7 +353,9 @@ public struct Archive: Codable, Sendable {
     }
     public func encoded() throws -> Data {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(self)
+        let data = try encoder.encode(self)
+        guard data.count <= Self.maximumEncodedBytes else { throw ArchiveError.tooLarge }
+        return data
     }
 }
 public enum ArchiveError: Error, LocalizedError {

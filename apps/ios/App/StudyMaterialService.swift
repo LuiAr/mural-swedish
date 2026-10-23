@@ -52,6 +52,9 @@ import MuralCore
                 let result = try await Self.recapResponse(snapshot: snapshot, api: api)
                 try Task.checkCancellation()
                 guard self.generation == token, Self.contextIsCurrent(snapshot, coordinator: coordinator) else { return }
+                guard coordinator.store.recordStudyUsage(sessionID: sessionID, inputTokens: result.usage.input, outputTokens: result.usage.output)
+                else { throw StudyError.saveFailed }
+                coordinator.refreshStudySession(sessionID)
                 let decoded = try JSONDecoder().decode(ConversationRecapResponse.self, from: Data(result.text.utf8))
                 let sentPassages = Self.inputPassages(snapshot)
                 if decoded.status == .correction {
@@ -59,7 +62,7 @@ import MuralCore
                         String($0.text.prefix(2000)).contains(decoded.quote) }) else { throw StudyError.invalidResponse }
                 }
                 guard let recap = decoded.validated(for: snapshot) else { throw StudyError.invalidResponse }
-                guard coordinator.store.saveRecap(recap, inputTokens: result.usage.input, outputTokens: result.usage.output) else {
+                guard coordinator.store.saveRecap(recap) else {
                     throw StudyError.saveFailed
                 }
                 coordinator.refreshStudySession(sessionID)

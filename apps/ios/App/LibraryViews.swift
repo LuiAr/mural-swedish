@@ -186,6 +186,11 @@ struct WordDetailView: View {
                 Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary)
                 HStack { RecallBars(count: word.bars); Text(word.label).font(.subheadline) }
                 Text(word.explanation).font(.body)
+                if store.language.id == "sv" {
+                    Divider()
+                    SwedishWordFormsView(word: word, coordinator: coordinator)
+                    Divider()
+                }
                 Text("“\(word.example)”").font(.system(.title3, design: .rounded)).padding(20).frame(maxWidth: .infinity, alignment: .leading).background(MuralColor.peach, in: RoundedRectangle(cornerRadius: 22))
                 if !word.example.isEmpty {
                     VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.example, language: coordinator.language,
@@ -197,7 +202,7 @@ struct WordDetailView: View {
                 Button("Remove from my words", role: .destructive) { store.hideWord(word.id); dismiss() }.font(.footnote)
               }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
             }.background(MuralColor.cream).foregroundStyle(MuralColor.ink)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("close-word-details") } }
         }.presentationDetents([.medium, .large]).onDisappear { coordinator.pronunciation.stop() }
     }
 }

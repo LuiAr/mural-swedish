@@ -1196,10 +1196,10 @@ class MuralViewModel(application: Application) : AndroidViewModel(application) {
         finalAssessments.cancel(id); hostedFinalAssessmentJobs.remove(id)?.cancel(); hostedBindings.forgetLearning(id)
         finalAssessmentTickets = finalAssessmentTickets.filterNot { it.sessionID == id }
         if (session?.id == id) resetConversation()
-        archive = archive.copy(sessions = archive.sessions.filterNot { it.id == id }.toMutableList()); archive.pruneWordReviews(); persist()
+        archive = archive.copy(sessions = archive.sessions.filterNot { it.id == id }.toMutableList()); archive.pruneWordReviews(); archive.pruneSwedishWordForms(); persist()
     }
     fun hideWord(id: String) {
-        archive = archive.copy(preferences = archive.preferences.copy(hiddenWords = (archive.preferences.hiddenWords + id).distinct())); archive.pruneWordReviews(); persist()
+        archive = archive.copy(preferences = archive.preferences.copy(hiddenWords = (archive.preferences.hiddenWords + id).distinct())); archive.pruneWordReviews(); archive.pruneSwedishWordForms(); persist()
     }
     fun correctPassage(sessionID: String, passageID: String, text: String) {
         if (isRunning) return
@@ -1207,7 +1207,7 @@ class MuralViewModel(application: Application) : AndroidViewModel(application) {
         val passage = record.passages.firstOrNull { it.id == passageID && it.speaker == Speaker.user } ?: return
         finalAssessments.cancel(sessionID); hostedFinalAssessmentJobs.remove(sessionID)?.cancel(); generation++; meanings.reset()
         passage.fragments.forEachIndexed { index, f -> record.correctFragment(f.id, if (index == 0) text.take(10000) else "") }
-        save(record); archive.pruneWordReviews(); persist(); if (session?.id == record.id) session = record
+        save(record); archive.pruneWordReviews(); archive.pruneSwedishWordForms(); persist(); if (session?.id == record.id) session = record
     }
     fun deleteLearningData() {
         if (isRunning || !storageReady) return
@@ -1215,7 +1215,7 @@ class MuralViewModel(application: Application) : AndroidViewModel(application) {
         finalAssessments.cancelAll(); hostedSessionIDs.forEach(hostedBindings::forgetLearning)
         hostedFinalAssessmentJobs.values.toList().forEach { it.cancel() }; hostedFinalAssessmentJobs.clear(); resetConversation()
         finalAssessmentTickets = emptyList()
-        archive = archive.copy(sessions = mutableListOf(), preferences = archive.preferences.copy(hiddenWords = emptyList()), wordReviews = null); persist()
+        archive = archive.copy(sessions = mutableListOf(), preferences = archive.preferences.copy(hiddenWords = emptyList()), wordReviews = null, swedishWordForms = null); persist()
     }
     fun exportData(): String = ArchiveCodec.encode(archive)
     fun importData(data: String): Boolean {

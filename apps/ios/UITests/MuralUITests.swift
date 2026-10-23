@@ -313,6 +313,14 @@ final class MuralUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Label did not update to \(value)", file: file, line: line)
     }
 
+    private func revealStudyControl(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 {
+            if element.isHittable { return }
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable)
+    }
+
     private func confirmAdult(in app: XCUIApplication) {
         let control = app.switches["onboarding-adult-confirmation"]
         XCTAssertTrue(control.exists)
@@ -1449,13 +1457,44 @@ final class MuralUITests: XCTestCase {
         }
     }
 
+    func testSwedishWordFormsCacheNounsAndVerbs() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--preview-key", "--screenshot=words", "--preview-swedish-study", "--preview-word-forms"]
+        app.launch()
+        let book = app.buttons["word-row-sv|en bok|book"]
+        XCTAssertTrue(book.waitForExistence(timeout: 10))
+        book.tap()
+        let generate = app.buttons["generate-word-forms"]
+        XCTAssertTrue(generate.waitForExistence(timeout: 5))
+        revealStudyControl(generate, in: app)
+        generate.tap()
+        let plural = app.staticTexts["word-form-indefinitePlural"]
+        XCTAssertTrue(plural.waitForExistence(timeout: 5))
+        revealStudyControl(plural, in: app)
+        XCTAssertEqual(plural.label, "böcker")
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish noun forms"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["close-word-details"].tap()
+        book.tap()
+        XCTAssertTrue(plural.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["generate-word-forms"].exists)
+        app.buttons["close-word-details"].tap()
+        app.buttons["word-row-sv|att läsa|to read"].tap()
+        XCTAssertTrue(generate.waitForExistence(timeout: 5))
+        revealStudyControl(generate, in: app)
+        generate.tap()
+        let past = app.staticTexts["word-form-past"]
+        XCTAssertTrue(past.waitForExistence(timeout: 5))
+        revealStudyControl(past, in: app)
+        XCTAssertEqual(past.label, "läste")
+    }
+
     func testConversationRecapRetryKeepsOriginalTranscript() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview", "--preview-key", "--screenshot=words", "--preview-swedish-study", "--preview-recap", "--preview-pronunciation"]
         app.launch()
         let history = app.buttons["open-session-history"]
         XCTAssertTrue(history.waitForExistence(timeout: 10))
-        reveal(history, in: app)
+        revealStudyControl(history, in: app)
         history.tap()
         let session = app.buttons["history-session"].firstMatch
         XCTAssertTrue(session.waitForExistence(timeout: 5))
@@ -1467,13 +1506,13 @@ final class MuralUITests: XCTestCase {
         XCTAssertEqual(original.label, "Jag läser en bok igår.")
         XCTAssertEqual(app.staticTexts["recap-suggestion"].label, "Jag läste en bok igår.")
         let tryAgain = app.buttons["recap-try-again"]
-        reveal(tryAgain, in: app)
+        revealStudyControl(tryAgain, in: app)
         tryAgain.tap()
         XCTAssertFalse(app.staticTexts["recap-suggestion"].exists)
         let answer = app.descendants(matching: .any)["recap-practice-answer"].firstMatch
         answer.tap(); answer.typeText("Jag läste en bok igår.")
         let compare = app.buttons["recap-reveal-answer"]
-        reveal(compare, in: app)
+        revealStudyControl(compare, in: app)
         compare.tap()
         XCTAssertTrue(app.staticTexts["recap-suggestion"].waitForExistence(timeout: 3))
         let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish conversation recap"; capture.lifetime = .keepAlways; add(capture)
