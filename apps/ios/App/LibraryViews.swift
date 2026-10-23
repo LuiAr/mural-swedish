@@ -150,31 +150,43 @@ struct WordsView: View {
                 Button("Past conversations", systemImage: "clock.arrow.circlepath") { sessions = true }.font(.subheadline).padding(.vertical, 8)
             }.padding(26)
         }.foregroundStyle(MuralColor.ink).searchable(text: $search, prompt: "Find a word")
-            .sheet(item: $selected) { word in WordDetailView(word: word, store: coordinator.store) }
+            .sheet(item: $selected) { word in WordDetailView(word: word, coordinator: coordinator) }
             .sheet(isPresented: $sessions) { SessionHistoryView(store: coordinator.store) }
-            .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck) }
+            .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck, coordinator: coordinator) }
+            .onDisappear { coordinator.pronunciation.stop() }
+            .onChange(of: coordinator.language.id) { _, _ in selected = nil; flashcards = nil; coordinator.pronunciation.stop() }
     }
 }
 
 struct WordDetailView: View {
     let word: WordState
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 24) {
                 Text(word.lemma).font(.system(.largeTitle, design: .rounded, weight: .medium))
                 if store.language.id == "zh" { PinyinHelp(text: word.lemma) }
+                VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.lemma, language: coordinator.language,
+                                           id: "word-detail-pronunciation", allowed: !coordinator.isRunning)
                 Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary)
                 HStack { RecallBars(count: word.bars); Text(word.label).font(.subheadline) }
                 Text(word.explanation).font(.body)
                 Text("“\(word.example)”").font(.system(.title3, design: .rounded)).padding(20).frame(maxWidth: .infinity, alignment: .leading).background(MuralColor.peach, in: RoundedRectangle(cornerRadius: 22))
+                if !word.example.isEmpty {
+                    VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.example, language: coordinator.language,
+                                               id: "word-example-pronunciation", allowed: !coordinator.isRunning)
+                }
+                Text(coordinator.isRunning ? "End or pause the conversation to listen here." : "Listening uses your iPhone’s installed voices.")
+                    .font(.footnote).foregroundStyle(MuralColor.secondary)
                 Text("\(word.independentCount) independent uses · Last seen \(word.lastSeen.formatted(date: .abbreviated, time: .omitted))").font(.footnote).foregroundStyle(MuralColor.secondary)
                 Button("Remove from my words", role: .destructive) { store.hideWord(word.id); dismiss() }.font(.footnote)
-                Spacer()
-            }.padding(28).frame(maxWidth: .infinity, alignment: .leading).background(MuralColor.cream).foregroundStyle(MuralColor.ink)
+              }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
+            }.background(MuralColor.cream).foregroundStyle(MuralColor.ink)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }.presentationDetents([.medium, .large])
+        }.presentationDetents([.medium, .large]).onDisappear { coordinator.pronunciation.stop() }
     }
 }
 
@@ -694,6 +706,7 @@ private struct FlashcardSession: Identifiable {
 
 private struct FlashcardsView: View {
     let deck: FlashcardDeck
+    let coordinator: ConversationCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selection = 0
@@ -712,11 +725,11 @@ private struct FlashcardsView: View {
                         let destination = deck.destination(from: selection, direction: direction)
                         ZStack {
                             if destination != selection {
-                                FlashcardView(word: deck.words[destination], selected: false, showContent: abs(dragOffset) > 6)
+                                FlashcardView(word: deck.words[destination], coordinator: coordinator, selected: false, showContent: abs(dragOffset) > 6)
                                     .padding(.horizontal, 24).scaleEffect(0.94 + min(abs(dragOffset) / geometry.size.width, 1) * 0.06)
                                     .offset(y: 12).opacity(0.7).allowsHitTesting(false).accessibilityHidden(true)
                             }
-                            FlashcardView(word: deck.words[selection], selected: true, canReveal: { !advancing && Date() > revealAllowedAfter }).id(deck.words[selection].id)
+                            FlashcardView(word: deck.words[selection], coordinator: coordinator, selected: true, canReveal: { !advancing && Date() > revealAllowedAfter }).id(deck.words[selection].id)
                                 .padding(.horizontal, 24).offset(x: dragOffset)
                                 .rotationEffect(.degrees(reduceMotion ? 0 : dragOffset / geometry.size.width * 12))
                                 .simultaneousGesture(DragGesture(minimumDistance: 12)
@@ -756,6 +769,7 @@ private struct FlashcardsView: View {
                 .navigationTitle("Your words").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("close-flashcards") } }
         }.tint(MuralColor.ink).presentationDetents([.large]).presentationDragIndicator(.hidden).interactiveDismissDisabled()
+            .onDisappear { coordinator.pronunciation.stop() }
     }
     private func move(_ direction: Int, width: Double) {
         guard !advancing else { return }
@@ -764,6 +778,7 @@ private struct FlashcardsView: View {
             withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.82)) { dragOffset = 0 }
             return
         }
+        coordinator.pronunciation.stop()
         if reduceMotion { selection = destination; dragOffset = 0; return }
         advancing = true
         withAnimation(.easeIn(duration: 0.2), completionCriteria: .logicallyComplete) {
@@ -778,6 +793,7 @@ private struct FlashcardsView: View {
 
 private struct FlashcardView: View {
     let word: WordState
+    let coordinator: ConversationCoordinator
     let selected: Bool
     var canReveal: () -> Bool = { true }
     var showContent = true
@@ -798,9 +814,17 @@ private struct FlashcardView: View {
                     .accessibilityElement(children: .combine).accessibilityIdentifier("flashcard-proficiency")
                 Text(word.lemma).font(.system(.largeTitle, design: .rounded, weight: .medium))
                     .multilineTextAlignment(.center).textSelection(.enabled).accessibilityIdentifier("flashcard-word")
+                VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.lemma, language: coordinator.language,
+                                           id: "flashcard-word-pronunciation", allowed: selected && !coordinator.isRunning)
                 if back {
                     Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary).multilineTextAlignment(.center)
                         .accessibilityIdentifier("flashcard-meaning")
+                    if !word.example.isEmpty {
+                        Text("From your conversation").font(.caption).foregroundStyle(MuralColor.secondary)
+                        Text(word.example).font(.body).accessibilityIdentifier("flashcard-example")
+                        VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.example, language: coordinator.language,
+                                                   id: "flashcard-example-pronunciation", allowed: selected && !coordinator.isRunning)
+                    }
                 }
                 Button(back ? "Hide meaning" : "Tap to reveal meaning") { reveal() }
                     .font(.subheadline).foregroundStyle(MuralColor.secondary).frame(minHeight: 44)

@@ -7,6 +7,7 @@ import MuralCore
 
 @MainActor @Observable final class ConversationCoordinator {
     let store: LearningStore
+    let pronunciation = PronunciationPlayer()
     private(set) var state: ConnectionState = .idle
     private(set) var session: SessionRecord?
     var selectedTheme: ConversationTheme?
@@ -185,7 +186,7 @@ import MuralCore
         }
         observers.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] notification in
             guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt, raw == AVAudioSession.InterruptionType.began.rawValue else { return }
-            Task { @MainActor in self?.end(reason: "Audio interrupted") }
+            Task { @MainActor in self?.pronunciation.stop(); self?.end(reason: "Audio interrupted") }
         })
     }
     var isRunning: Bool { state == .active || state == .connecting || state == .closing }
@@ -214,6 +215,7 @@ import MuralCore
         #endif
     }
     func start() {
+        pronunciation.stop()
         guard !isRunning, UIApplication.shared.applicationState == .active,
               UIApplication.shared.isProtectedDataAvailable else { return }
         if hasContinuation && !continuationReady {
@@ -378,6 +380,7 @@ import MuralCore
     }
     func selectLanguage(_ id: String) {
         guard !isRunning, id != language.id, LanguageRegistry.module(for: id) != nil else { return }
+        pronunciation.stop()
         clearContinuation(); clearPersonalPause()
         previousVoiceEstimate = 0; previousVoiceUsage = 0; transcriptOffset = 0
         cancelReset(); languageGeneration = UUID()
@@ -459,6 +462,7 @@ import MuralCore
         }
     }
     func background() {
+        pronunciation.stop()
         guard isRunning else { return }
         // A live audio session owns its microphone until deliberately ended, interrupted,
         // or closed by the existing silence/duration policy. Locking is not inactivity.

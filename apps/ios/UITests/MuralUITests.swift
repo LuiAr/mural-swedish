@@ -1444,6 +1444,34 @@ final class MuralUITests: XCTestCase {
         }
     }
 
+    func testVocabularyPlaybackAndSavedExample() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
+        app.launch()
+        XCTAssertTrue(app.buttons["open-flashcards"].waitForExistence(timeout: 10))
+        app.buttons["open-flashcards"].tap()
+        let listen = app.buttons["flashcard-word-pronunciation-play"]
+        XCTAssertTrue(listen.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["flashcard-example"].exists)
+        listen.tap()
+        XCTAssertEqual(listen.label, "Stop pronunciation")
+        app.buttons["flashcard-word-pronunciation-slow"].tap()
+        XCTAssertEqual(listen.label, "Hear pronunciation")
+        XCTAssertEqual(app.buttons["flashcard-word-pronunciation-slow"].label, "Stop pronunciation")
+        app.buttons["reveal-flashcard"].tap()
+        let example = app.staticTexts["flashcard-example"]
+        XCTAssertTrue(example.waitForExistence(timeout: 3))
+        let exampleListen = app.buttons["flashcard-example-pronunciation-play"]
+        if !exampleListen.isHittable { app.swipeUp() }
+        XCTAssertTrue(exampleListen.isHittable)
+        exampleListen.tap()
+        XCTAssertEqual(exampleListen.label, "Stop pronunciation")
+        app.buttons["close-flashcards"].tap()
+        app.buttons["open-flashcards"].tap()
+        XCTAssertEqual(app.buttons["flashcard-word-pronunciation-play"].label, "Hear pronunciation")
+        XCTAssertFalse(app.staticTexts["flashcard-example"].exists)
+    }
+
     func testFlashcardsRevealNavigateAndIgnoreVerticalSwipes() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview", "--screenshot=words"]

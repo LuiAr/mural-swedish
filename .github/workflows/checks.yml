@@ -13,6 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-study-tools:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: xcodebuild -version
+      - name: Build iPhone Simulator app
+        run: >-
+          xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/mural-native-checks
+          CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
+      - name: Verify offline vocabulary interface
+        run: >-
+          xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural
+          -destination 'platform=iOS Simulator,name=iPhone 17'
+          -derivedDataPath /tmp/mural-native-checks CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+          -parallel-testing-enabled NO
+          -only-testing:MuralUITests/MuralUITests/testVocabularyPlaybackAndSavedExample
+          -only-testing:MuralUITests/MuralUITests/testFlashcardsRevealNavigateAndIgnoreVerticalSwipes
+          -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
+          -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test
   swift-core:
     runs-on: macos-15
     timeout-minutes: 15
