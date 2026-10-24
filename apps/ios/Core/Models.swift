@@ -162,6 +162,7 @@ public struct SessionRecord: Codable, Identifiable, Sendable {
     public var outputTokens = 0
     public var searchCalls = 0
     public var endReason: String?
+    public var recap: ConversationRecap?
     public init(languageID: String = LanguageRegistry.defaultID, themeID: String? = nil, title: String? = nil) {
         self.languageID = languageID; self.themeID = themeID
         self.title = title ?? LanguageRegistry.module(for: languageID)?.defaultTitle ?? "A conversation"
@@ -178,6 +179,7 @@ public struct SessionRecord: Codable, Identifiable, Sendable {
     public mutating func invalidateChangedAssessments() {
         let current = Dictionary(uniqueKeysWithValues: passages.map { ($0.id, $0.revisionKey) })
         assessments.removeAll { current[$0.passageID] != $0.revisionKey }
+        if let recap, !recap.isValid(for: self) { self.recap = nil }
     }
     public mutating func correctFragment(id: String, text: String) {
         guard let index = fragments.firstIndex(where: { $0.id == id }) else { return }
@@ -212,12 +214,17 @@ public struct Archive: Codable, Sendable {
     public var schemaVersion = 2
     public var sessions: [SessionRecord] = []
     public var preferences = Preferences()
+    /// Optional additive schema-2 field: older backups have no practice schedule.
+    public var wordReviews: [WordReview]?
+    public var swedishWordForms: [SwedishWordForms]?
     public init() {}
     public static func decode(_ data: Data) throws -> Archive {
         guard data.count <= maximumEncodedBytes else { throw ArchiveError.tooLarge }
         let migrated = try migrate(data)
-        let archive = try JSONDecoder().decode(Archive.self, from: migrated)
+        var archive = try JSONDecoder().decode(Archive.self, from: migrated)
         try archive.validate()
+        archive.pruneWordReviews()
+        archive.pruneSwedishWordForms()
         return archive
     }
     /// Bound the selected file before loading it. The read limit also covers growth after the size check.
@@ -247,15 +254,62 @@ public struct Archive: Codable, Sendable {
             session.assessments = session.assessments.compactMap { LearningEngine.validate($0, session: session) }
             candidate.sessions.append(session)
         }
+        // A backup may add newer study material for an existing conversation,
+        // but must never replace that conversation's source or learning evidence.
+        for session in incoming.sessions {
+            guard let recap = session.recap,
+                  let index = candidate.sessions.firstIndex(where: { $0.id == session.id }),
+                  recap.isValid(for: candidate.sessions[index]),
+                  candidate.sessions[index].recap.map({ $0.createdAt < recap.createdAt }) ?? true else { continue }
+            candidate.sessions[index].recap = recap
+        }
+        var reviews = Dictionary((wordReviews ?? []).map { ($0.wordID, $0) }, uniquingKeysWith: { first, _ in first })
+        for review in incoming.wordReviews ?? [] where reviews[review.wordID].map({ $0.reviewedAt < review.reviewedAt }) ?? true {
+            reviews[review.wordID] = review
+        }
+        candidate.wordReviews = reviews.isEmpty ? nil : reviews.values.sorted { $0.wordID < $1.wordID }
+        candidate.pruneWordReviews()
+        let available = Dictionary(LearningEngine.project(candidate.sessions, languageID: "sv",
+            hiddenWords: candidate.preferences.hiddenWords).words.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var cards: [String: SwedishWordForms] = [:]
+        for card in (swedishWordForms ?? []) + (incoming.swedishWordForms ?? []) {
+            guard let word = available[card.wordID], card.isValid(for: word),
+                  cards[card.wordID].map({ $0.createdAt < card.createdAt }) ?? true else { continue }
+            cards[card.wordID] = card
+        }
+        candidate.swedishWordForms = cards.isEmpty ? nil : cards.values.sorted { $0.wordID < $1.wordID }
         try candidate.validate()
         guard try candidate.encoded().count <= Self.maximumEncodedBytes else { throw ArchiveError.tooLarge }
         return candidate
+    }
+    /// A practice record cannot bring back hidden words or deleted learning evidence.
+    public mutating func pruneWordReviews() {
+        guard let reviews = wordReviews, !reviews.isEmpty else { wordReviews = nil; return }
+        let languages = Set(reviews.map(\.languageID))
+        let available = Set(languages.flatMap { language in
+            LearningEngine.project(sessions, languageID: language, hiddenWords: preferences.hiddenWords).words.map(\.id)
+        })
+        let retained = reviews.filter { available.contains($0.wordID) }
+        wordReviews = retained.isEmpty ? nil : retained
+    }
+    public mutating func pruneSwedishWordForms() {
+        guard let cards = swedishWordForms, !cards.isEmpty else { swedishWordForms = nil; return }
+        let available = Dictionary(LearningEngine.project(sessions, languageID: "sv", hiddenWords: preferences.hiddenWords)
+            .words.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let retained = cards.filter { card in available[card.wordID].map { card.isValid(for: $0) } ?? false }
+        swedishWordForms = retained.isEmpty ? nil : retained
     }
     private func validate() throws {
         guard LanguageRegistry.module(for: preferences.learningLanguageID) != nil else { throw ArchiveError.unsupportedLanguage }
         guard Set(sessions.map(\.id)).count == sessions.count,
               sessions.count <= Self.maximumSessions,
               preferences.sessionMinutes >= 1, preferences.sessionMinutes <= 60 else { throw ArchiveError.invalid }
+        let reviews = wordReviews ?? []
+        guard reviews.count <= 50_000, Set(reviews.map(\.wordID)).count == reviews.count,
+              reviews.allSatisfy(\.isValid) else { throw ArchiveError.invalid }
+        let cards = swedishWordForms ?? []
+        guard cards.count <= 50_000, Set(cards.map(\.wordID)).count == cards.count,
+              cards.allSatisfy(\.isWellFormed) else { throw ArchiveError.invalid }
         func validDate(_ date: Date) -> Bool { date >= .distantPast && date <= .distantFuture }
         for s in sessions {
             guard LanguageRegistry.module(for: s.languageID) != nil else { throw ArchiveError.unsupportedLanguage }
@@ -268,6 +322,7 @@ public struct Archive: Codable, Sendable {
                   s.fragments.allSatisfy({ $0.startMS >= 0 && $0.endMS >= $0.startMS && $0.text.count <= 50_000 &&
                       (0...1_000_000).contains($0.revision) && validDate($0.receivedAt) }),
                   s.topics.allSatisfy({ $0.languageID == s.languageID && validDate($0.retrievedAt) }) else { throw ArchiveError.invalid }
+            guard s.recap.map({ $0.isValid(for: s) }) ?? true else { throw ArchiveError.invalid }
         }
     }
     /// Version 1 was Norwegian-only. Migration assigns that provenance once;
@@ -298,7 +353,9 @@ public struct Archive: Codable, Sendable {
     }
     public func encoded() throws -> Data {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(self)
+        let data = try encoder.encode(self)
+        guard data.count <= Self.maximumEncodedBytes else { throw ArchiveError.tooLarge }
+        return data
     }
 }
 public enum ArchiveError: Error, LocalizedError {

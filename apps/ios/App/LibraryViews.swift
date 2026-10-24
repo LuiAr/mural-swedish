@@ -94,6 +94,7 @@ struct WordsView: View {
     @State private var selected: WordState?
     @State private var sessions = false
     @State private var flashcards: FlashcardSession?
+    @State private var dailyReview: DailyReviewSession?
     private var learner: LearnerState { coordinator.store.learner }
     private var words: [WordState] { learner.words.filter { search.isEmpty || $0.lemma.localizedCaseInsensitiveContains(search) || $0.meaning.localizedCaseInsensitiveContains(search) } }
     var body: some View {
@@ -132,11 +133,20 @@ struct WordsView: View {
                                     }
                                     Spacer(minLength: 10)
                                     VStack(alignment: .trailing, spacing: 8) { RecallBars(count: word.bars); Text(word.label).font(.caption2).foregroundStyle(MuralColor.secondary) }
-                                }.padding(.vertical, 20)
-                            }.buttonStyle(.plain)
+                                }.padding(.vertical, 20).contentShape(Rectangle())
+                            }.buttonStyle(.plain).accessibilityIdentifier("word-row-" + word.id)
                             Divider().overlay(MuralColor.peach)
                         }
                     }
+                }
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    let dueWords = coordinator.store.dailyReviewWords(at: context.date)
+                    Button {
+                        dailyReview = DailyReviewSession(words: dueWords, languageID: coordinator.language.id)
+                    } label: {
+                        Label(dueWords.isEmpty ? "You’re caught up for today" : "Daily review · \(dueWords.count) words", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }.disabled(dueWords.isEmpty).accessibilityIdentifier("open-daily-review")
                 }
                 HStack { Text("1 · Fragile"); Spacer(); Text("2 · Growing"); Spacer(); Text("3 · Steady") }.font(.caption).foregroundStyle(MuralColor.secondary)
                 Text("The bars estimate spoken recall, not permanent mastery. Using a word with visible meanings counts as supported practice.").font(.footnote).foregroundStyle(MuralColor.secondary)
@@ -148,33 +158,52 @@ struct WordsView: View {
                     }.padding(22).background(MuralColor.butter, in: RoundedRectangle(cornerRadius: 24))
                 }
                 Button("Past conversations", systemImage: "clock.arrow.circlepath") { sessions = true }.font(.subheadline).padding(.vertical, 8)
+                    .accessibilityIdentifier("open-session-history")
             }.padding(26)
         }.foregroundStyle(MuralColor.ink).searchable(text: $search, prompt: "Find a word")
-            .sheet(item: $selected) { word in WordDetailView(word: word, store: coordinator.store) }
-            .sheet(isPresented: $sessions) { SessionHistoryView(store: coordinator.store) }
-            .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck) }
+            .sheet(item: $selected) { word in WordDetailView(word: word, coordinator: coordinator) }
+            .sheet(isPresented: $sessions) { SessionHistoryView(coordinator: coordinator) }
+            .sheet(item: $flashcards) { session in FlashcardsView(deck: session.deck, coordinator: coordinator) }
+            .sheet(item: $dailyReview) { review in DailyReviewView(review: review, coordinator: coordinator) }
+            .onDisappear { coordinator.pronunciation.stop() }
+            .onChange(of: coordinator.language.id) { _, _ in selected = nil; flashcards = nil; coordinator.pronunciation.stop() }
     }
 }
 
 struct WordDetailView: View {
     let word: WordState
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 24) {
                 Text(word.lemma).font(.system(.largeTitle, design: .rounded, weight: .medium))
                 if store.language.id == "zh" { PinyinHelp(text: word.lemma) }
+                VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.lemma, language: coordinator.language,
+                                           id: "word-detail-pronunciation", allowed: !coordinator.isRunning)
                 Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary)
                 HStack { RecallBars(count: word.bars); Text(word.label).font(.subheadline) }
                 Text(word.explanation).font(.body)
+                if store.language.id == "sv" {
+                    Divider()
+                    SwedishWordFormsView(word: word, coordinator: coordinator)
+                    Divider()
+                }
                 Text("“\(word.example)”").font(.system(.title3, design: .rounded)).padding(20).frame(maxWidth: .infinity, alignment: .leading).background(MuralColor.peach, in: RoundedRectangle(cornerRadius: 22))
+                if !word.example.isEmpty {
+                    VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.example, language: coordinator.language,
+                                               id: "word-example-pronunciation", allowed: !coordinator.isRunning)
+                }
+                Text(coordinator.isRunning ? "End or pause the conversation to listen here." : "Listening uses your iPhone’s installed voices.")
+                    .font(.footnote).foregroundStyle(MuralColor.secondary)
                 Text("\(word.independentCount) independent uses · Last seen \(word.lastSeen.formatted(date: .abbreviated, time: .omitted))").font(.footnote).foregroundStyle(MuralColor.secondary)
                 Button("Remove from my words", role: .destructive) { store.hideWord(word.id); dismiss() }.font(.footnote)
-                Spacer()
-            }.padding(28).frame(maxWidth: .infinity, alignment: .leading).background(MuralColor.cream).foregroundStyle(MuralColor.ink)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }.presentationDetents([.medium, .large])
+              }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
+            }.background(MuralColor.cream).foregroundStyle(MuralColor.ink)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("close-word-details") } }
+        }.presentationDetents([.medium, .large]).onDisappear { coordinator.pronunciation.stop() }
     }
 }
 
@@ -221,7 +250,8 @@ struct TranscriptView: View {
 }
 
 struct SessionHistoryView: View {
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @State private var selected: SessionRecord?
     @State private var deleting: SessionRecord?
     @Environment(\.dismiss) private var dismiss
@@ -235,12 +265,13 @@ struct SessionHistoryView: View {
                             Text(session.title).font(.headline)
                             Text(session.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(MuralColor.secondary)
                         }.padding(.vertical, 8)
-                    }.swipeActions { Button("Delete", role: .destructive) { deleting = session }.disabled(session.endedAt == nil) }
+                    }.accessibilityIdentifier("history-session")
+                        .swipeActions { Button("Delete", role: .destructive) { deleting = session }.disabled(session.endedAt == nil) }
                 }
             }.scrollContentBackground(.hidden).background(MuralColor.cream)
                 .navigationTitle("Past conversations").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }.sheet(item: $selected) { session in EditableTranscriptView(sessionID: session.id, store: store) }
+        }.sheet(item: $selected) { session in EditableTranscriptView(sessionID: session.id, coordinator: coordinator) }
             .confirmationDialog("Delete this conversation and its learning evidence?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
                 Button("Delete conversation", role: .destructive) { if let deleting { store.deleteSession(deleting.id) }; deleting = nil }
             }
@@ -257,15 +288,21 @@ struct BackupDocument: FileDocument {
 
 struct EditableTranscriptView: View {
     let sessionID: UUID
-    let store: LearningStore
+    let coordinator: ConversationCoordinator
+    private var store: LearningStore { coordinator.store }
     @Environment(\.dismiss) private var dismiss
     @State private var editingID: String?
     @State private var editedText = ""
+    @State private var showingRecap = false
     private var session: SessionRecord? { store.sessions.first { $0.id == sessionID } }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    if session?.endedAt != nil {
+                        Button("Review this conversation", systemImage: "text.bubble") { showingRecap = true }
+                            .accessibilityIdentifier("open-conversation-recap")
+                    }
                     ForEach(session?.passages ?? []) { passage in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -294,10 +331,14 @@ struct EditableTranscriptView: View {
                 }.padding(24).background(MuralColor.cream).navigationTitle("What you said").navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editingID = nil } }
-                        ToolbarItem(placement: .confirmationAction) { Button("Save") { if let id = editingID { store.correctPassage(sessionID: sessionID, passageID: id, text: editedText) }; editingID = nil } }
+                        ToolbarItem(placement: .confirmationAction) { Button("Save") {
+                            if let id = editingID { store.correctPassage(sessionID: sessionID, passageID: id, text: editedText); coordinator.refreshStudySession(sessionID) }
+                            editingID = nil
+                        } }
                     }
             }.presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingRecap) { ConversationRecapView(sessionID: sessionID, coordinator: coordinator) }
     }
 }
 
@@ -694,6 +735,7 @@ private struct FlashcardSession: Identifiable {
 
 private struct FlashcardsView: View {
     let deck: FlashcardDeck
+    let coordinator: ConversationCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selection = 0
@@ -712,11 +754,11 @@ private struct FlashcardsView: View {
                         let destination = deck.destination(from: selection, direction: direction)
                         ZStack {
                             if destination != selection {
-                                FlashcardView(word: deck.words[destination], selected: false, showContent: abs(dragOffset) > 6)
+                                FlashcardView(word: deck.words[destination], coordinator: coordinator, selected: false, showContent: abs(dragOffset) > 6)
                                     .padding(.horizontal, 24).scaleEffect(0.94 + min(abs(dragOffset) / geometry.size.width, 1) * 0.06)
                                     .offset(y: 12).opacity(0.7).allowsHitTesting(false).accessibilityHidden(true)
                             }
-                            FlashcardView(word: deck.words[selection], selected: true, canReveal: { !advancing && Date() > revealAllowedAfter }).id(deck.words[selection].id)
+                            FlashcardView(word: deck.words[selection], coordinator: coordinator, selected: true, canReveal: { !advancing && Date() > revealAllowedAfter }).id(deck.words[selection].id)
                                 .padding(.horizontal, 24).offset(x: dragOffset)
                                 .rotationEffect(.degrees(reduceMotion ? 0 : dragOffset / geometry.size.width * 12))
                                 .simultaneousGesture(DragGesture(minimumDistance: 12)
@@ -756,6 +798,7 @@ private struct FlashcardsView: View {
                 .navigationTitle("Your words").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("close-flashcards") } }
         }.tint(MuralColor.ink).presentationDetents([.large]).presentationDragIndicator(.hidden).interactiveDismissDisabled()
+            .onDisappear { coordinator.pronunciation.stop() }
     }
     private func move(_ direction: Int, width: Double) {
         guard !advancing else { return }
@@ -764,6 +807,7 @@ private struct FlashcardsView: View {
             withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.82)) { dragOffset = 0 }
             return
         }
+        coordinator.pronunciation.stop()
         if reduceMotion { selection = destination; dragOffset = 0; return }
         advancing = true
         withAnimation(.easeIn(duration: 0.2), completionCriteria: .logicallyComplete) {
@@ -778,6 +822,7 @@ private struct FlashcardsView: View {
 
 private struct FlashcardView: View {
     let word: WordState
+    let coordinator: ConversationCoordinator
     let selected: Bool
     var canReveal: () -> Bool = { true }
     var showContent = true
@@ -798,9 +843,17 @@ private struct FlashcardView: View {
                     .accessibilityElement(children: .combine).accessibilityIdentifier("flashcard-proficiency")
                 Text(word.lemma).font(.system(.largeTitle, design: .rounded, weight: .medium))
                     .multilineTextAlignment(.center).textSelection(.enabled).accessibilityIdentifier("flashcard-word")
+                VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.lemma, language: coordinator.language,
+                                           id: "flashcard-word-pronunciation", allowed: selected && !coordinator.isRunning)
                 if back {
                     Text(word.meaning).font(.title3).foregroundStyle(MuralColor.secondary).multilineTextAlignment(.center)
                         .accessibilityIdentifier("flashcard-meaning")
+                    if !word.example.isEmpty {
+                        Text("From your conversation").font(.caption).foregroundStyle(MuralColor.secondary)
+                        Text(word.example).font(.body).accessibilityIdentifier("flashcard-example")
+                        VocabularyPlaybackControls(player: coordinator.pronunciation, text: word.example, language: coordinator.language,
+                                                   id: "flashcard-example-pronunciation", allowed: selected && !coordinator.isRunning)
+                    }
                 }
                 Button(back ? "Hide meaning" : "Tap to reveal meaning") { reveal() }
                     .font(.subheadline).foregroundStyle(MuralColor.secondary).frame(minHeight: 44)
@@ -815,6 +868,7 @@ private struct FlashcardView: View {
     }
     private func reveal() {
         guard canReveal() else { return }
+        coordinator.pronunciation.stop()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.48)) { revealed.toggle() }
     }
 }

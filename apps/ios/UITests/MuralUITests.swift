@@ -304,8 +304,44 @@ final class MuralUITests: XCTestCase {
     }
 
     private func waitForFlashcardPage(_ value: String, in pager: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: pager)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Flashcard did not reach \(value)", file: file, line: line)
+        // Boundary gestures keep the value unchanged. Read a fresh snapshot first
+        // instead of depending on KVC polling of a previously resolved element.
+        let app = XCUIApplication()
+        func currentPager() -> XCUIElement {
+            app.descendants(matching: .any)["flashcard-pager"].firstMatch
+        }
+        if currentPager().value as? String == value { return }
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let current = currentPager()
+            return current.exists && current.value as? String == value
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [changed], timeout: 10)
+        if result != .completed {
+            print("Flashcard expected \(value); actual \(String(describing: pager.value))")
+            print(XCUIApplication().debugDescription)
+        }
+        XCTAssertEqual(result, .completed, "Flashcard did not reach \(value)", file: file, line: line)
+    }
+
+    private func waitForLabel(_ value: String, in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", value), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Label did not update to \(value)", file: file, line: line)
+    }
+
+    private func revealStudyControl(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 {
+            if element.isHittable { return }
+            app.swipeUp()
+        }
+        if !element.isHittable { print(app.debugDescription) }
+        XCTAssertTrue(element.isHittable)
+    }
+
+    private func openWord(_ word: XCUIElement, in app: XCUIApplication) {
+        word.tap()
+        let presented = app.buttons["close-word-details"].waitForExistence(timeout: 5)
+        if !presented { print(app.debugDescription) }
+        XCTAssertTrue(presented)
     }
 
     private func confirmAdult(in app: XCUIApplication) {
@@ -1444,6 +1480,125 @@ final class MuralUITests: XCTestCase {
         }
     }
 
+    func testSwedishWordFormsCacheNounsAndVerbs() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--preview-key", "--screenshot=words", "--preview-swedish-study", "--preview-word-forms"]
+        app.launch()
+        let book = app.buttons["word-row-sv|en bok|book"]
+        XCTAssertTrue(book.waitForExistence(timeout: 10))
+        openWord(book, in: app)
+        let generate = app.buttons["generate-word-forms"]
+        revealStudyControl(generate, in: app)
+        generate.tap()
+        let plural = app.staticTexts["word-form-indefinitePlural"]
+        revealStudyControl(plural, in: app)
+        XCTAssertEqual(plural.label, "böcker")
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish noun forms"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["close-word-details"].tap()
+        openWord(book, in: app)
+        revealStudyControl(plural, in: app)
+        XCTAssertFalse(app.buttons["generate-word-forms"].exists)
+        app.buttons["close-word-details"].tap()
+        openWord(app.buttons["word-row-sv|att läsa|to read"], in: app)
+        revealStudyControl(generate, in: app)
+        generate.tap()
+        let past = app.staticTexts["word-form-past"]
+        revealStudyControl(past, in: app)
+        XCTAssertEqual(past.label, "läste")
+    }
+
+    func testConversationRecapRetryKeepsOriginalTranscript() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--preview-key", "--screenshot=words", "--preview-swedish-study", "--preview-recap", "--preview-pronunciation"]
+        app.launch()
+        let history = app.buttons["open-session-history"]
+        XCTAssertTrue(history.waitForExistence(timeout: 10))
+        revealStudyControl(history, in: app)
+        history.tap()
+        let session = app.buttons["history-session"].firstMatch
+        XCTAssertTrue(session.waitForExistence(timeout: 5))
+        session.tap()
+        app.buttons["open-conversation-recap"].tap()
+        app.buttons["generate-recap"].tap()
+        let original = app.staticTexts["recap-original"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5))
+        XCTAssertEqual(original.label, "Jag läser en bok igår.")
+        XCTAssertEqual(app.staticTexts["recap-suggestion"].label, "Jag läste en bok igår.")
+        let tryAgain = app.buttons["recap-try-again"]
+        revealStudyControl(tryAgain, in: app)
+        tryAgain.tap()
+        XCTAssertFalse(app.staticTexts["recap-suggestion"].exists)
+        let answer = app.descendants(matching: .any)["recap-practice-answer"].firstMatch
+        answer.tap(); answer.typeText("Jag läste en bok igår.")
+        let compare = app.buttons["recap-reveal-answer"]
+        revealStudyControl(compare, in: app)
+        compare.tap()
+        XCTAssertTrue(app.staticTexts["recap-suggestion"].waitForExistence(timeout: 3))
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish conversation recap"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["close-recap"].tap()
+        XCTAssertEqual(app.staticTexts["transcript-user-passage"].label, "Jag läser en bok igår.")
+        app.buttons["open-conversation-recap"].tap()
+        XCTAssertTrue(app.staticTexts["recap-suggestion"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["generate-recap"].exists)
+    }
+
+    func testDailyReviewSavesGradesAndResumesRemainingWords() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
+        app.launch()
+        let open = app.buttons["open-daily-review"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        if !open.isHittable { app.swipeUp() }
+        open.tap()
+        XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
+        waitForLabel("1 of 4 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
+        app.buttons["daily-review-reveal"].tap()
+        XCTAssertTrue(app.staticTexts["daily-review-answer"].exists)
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Daily vocabulary review"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["daily-review-remembered"].tap()
+        waitForLabel("2 of 4 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
+        XCTAssertFalse(app.staticTexts["daily-review-answer"].exists)
+        app.buttons["close-daily-review"].tap()
+        if !open.isHittable { app.swipeUp() }
+        open.tap()
+        XCTAssertTrue(app.staticTexts["daily-review-cue"].waitForExistence(timeout: 5))
+        waitForLabel("1 of 3 · Up to five minutes", in: app.staticTexts["daily-review-progress"])
+        app.buttons["daily-review-reveal"].tap()
+        app.buttons["daily-review-needs-practice"].tap()
+        app.buttons["close-daily-review"].tap()
+        waitForLabel("Daily review · 2 words", in: open)
+    }
+
+    func testVocabularyPlaybackAndSavedExample() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--screenshot=words", "--preview-pronunciation"]
+        app.launch()
+        XCTAssertTrue(app.buttons["open-flashcards"].waitForExistence(timeout: 10))
+        app.buttons["open-flashcards"].tap()
+        let listen = app.buttons["flashcard-word-pronunciation-play"]
+        XCTAssertTrue(listen.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["flashcard-example"].exists)
+        listen.tap()
+        XCTAssertEqual(listen.label, "Stop pronunciation")
+        app.buttons["flashcard-word-pronunciation-slow"].tap()
+        XCTAssertEqual(listen.label, "Hear pronunciation")
+        XCTAssertEqual(app.buttons["flashcard-word-pronunciation-slow"].label, "Stop pronunciation")
+        app.buttons["reveal-flashcard"].tap()
+        let example = app.staticTexts["flashcard-example"]
+        XCTAssertTrue(example.waitForExistence(timeout: 3))
+        let exampleListen = app.buttons["flashcard-example-pronunciation-play"]
+        if !exampleListen.isHittable { app.swipeUp() }
+        XCTAssertTrue(exampleListen.isHittable)
+        exampleListen.tap()
+        XCTAssertEqual(exampleListen.label, "Stop pronunciation")
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Word and example listening"; capture.lifetime = .keepAlways; add(capture)
+        app.buttons["close-flashcards"].tap()
+        app.buttons["open-flashcards"].tap()
+        XCTAssertEqual(app.buttons["flashcard-word-pronunciation-play"].label, "Hear pronunciation")
+        XCTAssertFalse(app.staticTexts["flashcard-example"].exists)
+    }
+
     func testFlashcardsRevealNavigateAndIgnoreVerticalSwipes() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview", "--screenshot=words"]
@@ -1457,22 +1612,26 @@ final class MuralUITests: XCTestCase {
         let progress = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         XCTAssertTrue(progress.waitForExistence(timeout: 5))
         waitForFlashcardPage("1 of 4", in: progress)
+        // Check reveal before gestures: a boundary swipe leaves the page value
+        // unchanged while the intentional post-drag tap guard is still active.
+        let originalWord = app.staticTexts["flashcard-word"].label
+        app.buttons["reveal-flashcard"].tap()
+        XCTAssertTrue(app.staticTexts["flashcard-meaning"].waitForExistence(timeout: 3))
+        app.buttons["reveal-flashcard"].tap()
+        XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         let card = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         let shortDrag = card
         let start = shortDrag.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -24, dy: 0)))
+        // The default 500-point/s drag is a flick and can legitimately page
+        // through predicted velocity. Release a slow, stationary short drag.
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -24, dy: 0)),
+                    withVelocity: .slow, thenHoldForDuration: 0.3)
         waitForFlashcardPage("1 of 4", in: progress)
         shortDrag.swipeRight()
         waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertFalse(app.buttons["Previous word"].exists)
         XCTAssertFalse(app.staticTexts["flashcard-progress"].exists)
-        XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
-        let originalWord = app.staticTexts["flashcard-word"].label
-        app.buttons["reveal-flashcard"].tap()
-        XCTAssertTrue(app.staticTexts["flashcard-meaning"].waitForExistence(timeout: 3))
-        if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
-        app.buttons["reveal-flashcard"].tap()
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         card.swipeLeft()
@@ -1487,7 +1646,10 @@ final class MuralUITests: XCTestCase {
         waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertEqual(app.staticTexts["flashcard-word"].label, originalWord)
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
-        for _ in 0..<3 { card.swipeLeft() }
+        for page in 2...4 {
+            card.swipeLeft()
+            waitForFlashcardPage("\(page) of 4", in: progress)
+        }
         waitForFlashcardPage("4 of 4", in: progress)
         card.swipeLeft()
         waitForFlashcardPage("4 of 4", in: progress)

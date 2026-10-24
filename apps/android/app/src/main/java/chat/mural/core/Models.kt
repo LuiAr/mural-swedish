@@ -123,13 +123,18 @@ data class SessionRecord(
     var fragments: MutableList<Fragment> = mutableListOf(), var assessments: MutableList<Assessment> = mutableListOf(),
     var translations: MutableMap<String,String> = mutableMapOf(), var topics: MutableList<TopicBrief> = mutableListOf(),
     var voiceSeconds: Double = 0.0, var usageFinal: Boolean = false, var inputTokens: Int = 0,
-    var outputTokens: Int = 0, var searchCalls: Int = 0, var endReason: String? = null
+    var outputTokens: Int = 0, var searchCalls: Int = 0, var endReason: String? = null,
+    var recap: ConversationRecap? = null
 ) {
     val passages get() = Transcript.passages(fragments)
     // Voice captions use the provider timeline, not time since the local connection attempt.
     val nextTypedVoiceOffsetMS get() = (fragments.maxOfOrNull { it.endMS } ?: 0).coerceAtMost(Int.MAX_VALUE - 2) + 1
     fun append(f: Fragment) { if (fragments.none { it.id == f.id }) { fragments += f; invalidateChangedAssessments() } }
-    fun invalidateChangedAssessments() { val current = passages.associate { it.id to it.revisionKey }; assessments.removeAll { current[it.passageID] != it.revisionKey } }
+    fun invalidateChangedAssessments() {
+        val current = passages.associate { it.id to it.revisionKey }
+        assessments.removeAll { current[it.passageID] != it.revisionKey }
+        if (recap?.isValid(this) == false) recap = null
+    }
     fun correctFragment(id: String, text: String) {
         val i = fragments.indexOfFirst { it.id == id }; if (i < 0) return
         val f = fragments[i]; fragments[i] = f.copy(previousTexts = f.previousTexts + f.text, text = text, revision = f.revision + 1)
@@ -150,7 +155,22 @@ data class Preferences(
     var meaningLanguage: String = "English", var sessionMinutes: Int = 15, var hiddenWords: List<String> = emptyList(),
     var interests: String = "", var hasOnboarded: Boolean = false, var aiConsentVersion: Int? = null
 )
-@Serializable data class Archive(var schemaVersion: Int = 2, var sessions: MutableList<SessionRecord> = mutableListOf(), var preferences: Preferences = Preferences())
+@Serializable data class Archive(var schemaVersion: Int = 2, var sessions: MutableList<SessionRecord> = mutableListOf(), var preferences: Preferences = Preferences(), var wordReviews: List<WordReview>? = null,
+    var swedishWordForms: List<SwedishWordForms>? = null) {
+    fun pruneWordReviews() {
+        val reviews = wordReviews ?: return
+        val available = reviews.map { it.languageID }.toSet().flatMap { language ->
+            LearningEngine.project(sessions, language, preferences.hiddenWords).words.map { it.id.canonical() }
+        }.toSet()
+        wordReviews = reviews.filter { it.wordID.canonical() in available }.takeIf { it.isNotEmpty() }
+    }
+    fun pruneSwedishWordForms() {
+        val cards = swedishWordForms ?: return
+        val available = LearningEngine.project(sessions, "sv", preferences.hiddenWords).words.associateBy { it.id.canonical() }
+        swedishWordForms = cards.filter { card -> available[card.wordID.canonical()]?.let { card.isValid(it) } == true }
+            .takeIf { it.isNotEmpty() }
+    }
+}
 class ArchiveError private constructor(val kind: Kind) : Exception() {
     enum class Kind { TOO_LARGE, UNSUPPORTED_VERSION, UNSUPPORTED_LANGUAGE, INVALID }
     companion object {
@@ -165,7 +185,11 @@ object ArchiveCodec {
     const val MAXIMUM_ENCODED_BYTES = 30_000_000
     private const val MAXIMUM_SESSIONS = 10_000
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
-    fun encode(a: Archive): String = json.encodeToString(Archive.serializer(), a)
+    fun encode(a: Archive): String {
+        val data = json.encodeToString(Archive.serializer(), a)
+        if (data.toByteArray(Charsets.UTF_8).size > MAXIMUM_ENCODED_BYTES) throw ArchiveError.TOO_LARGE
+        return data
+    }
     fun decode(data: String): Archive {
         if (data.toByteArray().size > MAXIMUM_ENCODED_BYTES) throw ArchiveError.TOO_LARGE
         val root = try { json.parseToJsonElement(data).jsonObject } catch (_: Exception) { throw ArchiveError.INVALID }
@@ -174,7 +198,7 @@ object ArchiveCodec {
             requireFields(migrated)
             json.decodeFromJsonElement<Archive>(migrated)
         } catch (e: ArchiveError) { throw e } catch (_: Exception) { throw ArchiveError.INVALID }
-        validate(a); return a
+        validate(a); a.pruneWordReviews(); a.pruneSwedishWordForms(); return a
     }
     fun merge(current: Archive, incoming: Archive): Archive {
         validate(incoming)
@@ -186,6 +210,27 @@ object ArchiveCodec {
             val s = source.copy(fragments=source.fragments.toMutableList(), assessments=source.assessments.toMutableList(), translations=source.translations.toMutableMap(), topics=source.topics.toMutableList())
             s.invalidateChangedAssessments(); s.assessments = s.assessments.mapNotNull { LearningEngine.validate(it,s) }.toMutableList(); out.sessions += s
         }
+        // Existing conversations retain their source and learning evidence.
+        incoming.sessions.forEach { source ->
+            val recap = source.recap
+            val currentSession = out.sessions.firstOrNull { it.id.equals(source.id, ignoreCase = true) }
+            if (recap != null && currentSession != null && recap.isValid(currentSession) &&
+                currentSession.recap?.let { it.createdAt < recap.createdAt } != false) currentSession.recap = recap
+        }
+        val reviews = (current.wordReviews ?: emptyList()).associateBy { it.wordID.canonical() }.toMutableMap()
+        (incoming.wordReviews ?: emptyList()).forEach { review ->
+            if (reviews[review.wordID.canonical()]?.let { it.reviewedAt < review.reviewedAt } != false) reviews[review.wordID.canonical()] = review
+        }
+        out.wordReviews = reviews.values.sortedBy { it.wordID }.takeIf { it.isNotEmpty() }
+        out.pruneWordReviews()
+        val available = LearningEngine.project(out.sessions, "sv", out.preferences.hiddenWords).words.associateBy { it.id.canonical() }
+        val cards = mutableMapOf<String, SwedishWordForms>()
+        ((current.swedishWordForms ?: emptyList()) + (incoming.swedishWordForms ?: emptyList())).forEach { card ->
+            val word = available[card.wordID.canonical()]
+            if (word != null && card.isValid(word) && cards[card.wordID.canonical()]?.let { it.createdAt < card.createdAt } != false)
+                cards[card.wordID.canonical()] = card
+        }
+        out.swedishWordForms = cards.values.sortedBy { it.wordID }.takeIf { it.isNotEmpty() }
         validate(out); if (encode(out).toByteArray().size > MAXIMUM_ENCODED_BYTES) throw ArchiveError.TOO_LARGE
         return out
     }
@@ -219,6 +264,13 @@ object ArchiveCodec {
         fields(root, "schemaVersion sessions preferences")
         val preferences = root.getValue("preferences").jsonObject
         fields(preferences, "learningLanguageID meaningVisible meaningLanguage sessionMinutes hiddenWords interests hasOnboarded")
+        root["wordReviews"]?.takeIf { it != JsonNull }?.jsonArray?.forEach { value ->
+            fields(value.jsonObject, "wordID languageID reviewedAt dueAt consecutiveRemembered")
+        }
+        root["swedishWordForms"]?.takeIf { it != JsonNull }?.jsonArray?.forEach { value ->
+            fields(value.jsonObject, "wordID lemma meaning sourceExample sourceForm sourceLastSeen createdAt kind forms note")
+            value.jsonObject.getValue("forms").jsonArray.forEach { form -> fields(form.jsonObject, "slot") }
+        }
         for (value in root.getValue("sessions").jsonArray) {
             val s = value.jsonObject
             fields(s, "id languageID startedAt title fragments assessments translations topics voiceSeconds usageFinal inputTokens outputTokens searchCalls")
@@ -239,11 +291,16 @@ object ArchiveCodec {
     private fun validate(a: Archive) {
         if (LanguageRegistry.get(a.preferences.learningLanguageID) == null) throw ArchiveError.UNSUPPORTED_LANGUAGE
         if (a.schemaVersion != 2 || a.sessions.size > MAXIMUM_SESSIONS || a.preferences.sessionMinutes !in 1..60 || a.sessions.map { it.id.lowercase() }.toSet().size != a.sessions.size) throw ArchiveError.INVALID
+        val reviews = a.wordReviews ?: emptyList()
+        if (reviews.size > 50_000 || reviews.map { it.wordID.canonical() }.toSet().size != reviews.size || reviews.any { !it.isValid }) throw ArchiveError.INVALID
+        val cards = a.swedishWordForms ?: emptyList()
+        if (cards.size > 50_000 || cards.map { it.wordID.canonical() }.toSet().size != cards.size || cards.any { !it.isWellFormed }) throw ArchiveError.INVALID
         a.sessions.forEach { s ->
             if (LanguageRegistry.get(s.languageID) == null) throw ArchiveError.UNSUPPORTED_LANGUAGE
             if (!validUUID(s.id) || !s.voiceSeconds.isFinite() || s.voiceSeconds !in 0.0..31536000.0 || listOf(s.inputTokens,s.outputTokens,s.searchCalls).any { it !in 0..1_000_000_000 } || !validDate(s.startedAt) || s.endedAt?.let { !validDate(it) } == true) throw ArchiveError.INVALID
             if (s.fragments.map { it.id }.toSet().size != s.fragments.size || s.fragments.any { it.startMS < 0 || it.endMS < it.startMS || it.text.length > 50000 || it.revision !in 0..1_000_000 || !validDate(it.receivedAt) }) throw ArchiveError.INVALID
             if (s.assessments.any { !validDate(it.createdAt) } || s.topics.any { !validUUID(it.id) || it.languageID != s.languageID || !validDate(it.retrievedAt) }) throw ArchiveError.INVALID
+            if (s.recap?.isValid(s) == false) throw ArchiveError.INVALID
         }
     }
 }

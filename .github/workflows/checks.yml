@@ -13,6 +13,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-study-tools:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: xcodebuild -version
+      - name: Build iPhone Simulator app
+        run: >-
+          xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/mural-native-checks
+          CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
+      - name: Verify offline vocabulary interface
+        run: >-
+          xcodebuild -project apps/ios/Mural.xcodeproj -scheme Mural
+          -destination 'platform=iOS Simulator,name=iPhone 17'
+          -derivedDataPath /tmp/mural-native-checks CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+          -resultBundlePath /tmp/mural-native-results.xcresult
+          -parallel-testing-enabled NO
+          -only-testing:MuralUITests/MuralUITests/testVocabularyPlaybackAndSavedExample
+          -only-testing:MuralUITests/MuralUITests/testDailyReviewSavesGradesAndResumesRemainingWords
+          -only-testing:MuralUITests/MuralUITests/testConversationRecapRetryKeepsOriginalTranscript
+          -only-testing:MuralUITests/MuralUITests/testSwedishWordFormsCacheNounsAndVerbs
+          -only-testing:MuralUITests/MuralUITests/testFlashcardsRevealNavigateAndIgnoreVerticalSwipes
+          -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
+          -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test
+      - name: Build iPhone release without signing
+        if: success() || failure()
+        run: >-
+          xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural -configuration Release
+          -destination 'generic/platform=iOS' -derivedDataPath /tmp/mural-native-checks
+          CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
+      - name: Export simulator screenshots
+        if: always()
+        run: |
+          if [[ -d /tmp/mural-native-results.xcresult ]]; then
+            xcrun xcresulttool get test-results summary --path /tmp/mural-native-results.xcresult
+            xcrun xcresulttool export attachments --path /tmp/mural-native-results.xcresult --output-path /tmp/mural-native-screenshots
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: native-study-screenshots
+          path: /tmp/mural-native-screenshots
+          retention-days: 7
   swift-core:
     runs-on: macos-15
     timeout-minutes: 15

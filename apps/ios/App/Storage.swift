@@ -47,18 +47,94 @@ import MuralCore
     var sessions: [SessionRecord] { archive.sessions.sorted { $0.startedAt > $1.startedAt } }
     var learningSessions: [SessionRecord] { sessions.filter { $0.languageID == language.id } }
     var learner: LearnerState { LearningEngine.project(archive.sessions, languageID: language.id, hiddenWords: archive.preferences.hiddenWords) }
+    func dailyReviewWords(at date: Date = .now) -> [WordState] {
+        DailyReview.queue(words: learner.words, reviews: archive.wordReviews ?? [], languageID: language.id, now: date)
+    }
+    @discardableResult func recordReview(wordID: String, grade: ReviewGrade, at date: Date = .now) -> Bool {
+        guard learner.words.contains(where: { $0.id == wordID }) else { return false }
+        var reviews = archive.wordReviews ?? []
+        let previous = reviews.first { $0.wordID == wordID }
+        guard previous.map({ $0.reviewedAt <= date }) ?? true else { return false }
+        let review = DailyReview.record(wordID: wordID, languageID: language.id, grade: grade, previous: previous, at: date)
+        guard review.isValid else { return false }
+        reviews.removeAll { $0.wordID == wordID }; reviews.append(review)
+        let previousReviews = archive.wordReviews, previousPayload = document.payload
+        archive.wordReviews = reviews; persist()
+        guard error == nil else {
+            archive.wordReviews = previousReviews; document.payload = previousPayload
+            return false
+        }
+        return true
+    }
     func selectLanguage(_ id: String) {
         guard LanguageRegistry.module(for: id) != nil else { return }
         archive.preferences.learningLanguageID = id; persist()
     }
     func updatePreferences(_ change: (inout Preferences) -> Void) { change(&archive.preferences); persist() }
     func save(_ session: SessionRecord) {
+        var session = session
+        session.invalidateChangedAssessments()
         if let i = archive.sessions.firstIndex(where: { $0.id == session.id }) { archive.sessions[i] = session }
         else { archive.sessions.append(session) }
         persist()
     }
-    func deleteSession(_ id: UUID) { onSessionInvalidation?(id); archive.sessions.removeAll { $0.id == id }; persist() }
-    func hideWord(_ id: String) { archive.preferences.hiddenWords.append(id); persist() }
+    /// Account for a completed helper response even if its study content later
+    /// fails validation. This never recreates a deleted conversation.
+    @discardableResult func recordStudyUsage(sessionID: UUID, inputTokens: Int, outputTokens: Int) -> Bool {
+        guard let index = archive.sessions.firstIndex(where: { $0.id == sessionID }),
+              (0...1_000_000_000).contains(inputTokens), (0...1_000_000_000).contains(outputTokens),
+              archive.sessions[index].inputTokens <= 1_000_000_000 - inputTokens,
+              archive.sessions[index].outputTokens <= 1_000_000_000 - outputTokens else { return false }
+        if inputTokens == 0 && outputTokens == 0 { return true }
+        let previous = archive.sessions[index], previousPayload = document.payload
+        archive.sessions[index].inputTokens += inputTokens; archive.sessions[index].outputTokens += outputTokens
+        persist()
+        guard error == nil else {
+            archive.sessions[index] = previous; document.payload = previousPayload
+            return false
+        }
+        return true
+    }
+    /// Merge study material into the latest record so late assessments survive.
+    /// Failed persistence restores both the visible archive and stored payload.
+    @discardableResult func saveRecap(_ recap: ConversationRecap, inputTokens: Int = 0, outputTokens: Int = 0) -> Bool {
+        guard let index = archive.sessions.firstIndex(where: { $0.id == recap.sessionID }),
+              recap.isValid(for: archive.sessions[index]),
+              (0...1_000_000_000).contains(inputTokens), (0...1_000_000_000).contains(outputTokens),
+              archive.sessions[index].inputTokens <= 1_000_000_000 - inputTokens,
+              archive.sessions[index].outputTokens <= 1_000_000_000 - outputTokens else { return false }
+        let previous = archive.sessions[index], previousPayload = document.payload
+        archive.sessions[index].recap = recap
+        archive.sessions[index].inputTokens += inputTokens; archive.sessions[index].outputTokens += outputTokens
+        persist()
+        guard error == nil else {
+            archive.sessions[index] = previous; document.payload = previousPayload
+            return false
+        }
+        return true
+    }
+    func swedishForms(for word: WordState) -> SwedishWordForms? {
+        let current = LearningEngine.project(archive.sessions, languageID: "sv", hiddenWords: preferences.hiddenWords)
+            .words.first { $0.id == word.id }
+        guard let current else { return nil }
+        return archive.swedishWordForms?.first { $0.isValid(for: current) }
+    }
+    @discardableResult func saveSwedishForms(_ card: SwedishWordForms) -> Bool {
+        guard let word = LearningEngine.project(archive.sessions, languageID: "sv", hiddenWords: preferences.hiddenWords)
+            .words.first(where: { $0.id == card.wordID }), card.isValid(for: word) else { return false }
+        let previous = archive.swedishWordForms, previousPayload = document.payload
+        var cards = previous ?? []
+        cards.removeAll { $0.wordID == card.wordID }; cards.append(card)
+        guard cards.count <= 50_000 else { return false }
+        archive.swedishWordForms = cards; persist()
+        guard error == nil else {
+            archive.swedishWordForms = previous; document.payload = previousPayload
+            return false
+        }
+        return true
+    }
+    func deleteSession(_ id: UUID) { onSessionInvalidation?(id); archive.sessions.removeAll { $0.id == id }; archive.pruneWordReviews(); archive.pruneSwedishWordForms(); persist() }
+    func hideWord(_ id: String) { archive.preferences.hiddenWords.append(id); archive.pruneWordReviews(); archive.pruneSwedishWordForms(); persist() }
     func correctPassage(sessionID: UUID, passageID: String, text: String) {
         guard let index = archive.sessions.firstIndex(where: { $0.id == sessionID }),
               let passage = archive.sessions[index].passages.first(where: { $0.id == passageID && $0.speaker == .user }) else { return }
@@ -66,6 +142,8 @@ import MuralCore
             archive.sessions[index].correctFragment(id: fragment.id, text: offset == 0 ? String(text.prefix(10_000)) : "")
         }
         onSessionInvalidation?(sessionID)
+        archive.pruneWordReviews()
+        archive.pruneSwedishWordForms()
         persist()
     }
     func deleteAll() {
@@ -78,7 +156,7 @@ import MuralCore
             }
         }
         archive.sessions.forEach { onSessionInvalidation?($0.id) }
-        archive.sessions = []; archive.preferences.hiddenWords = []; persist()
+        archive.sessions = []; archive.preferences.hiddenWords = []; archive.wordReviews = nil; archive.swedishWordForms = nil; persist()
     }
     func exportData() throws -> Data { try archive.encoded() }
     func importData(_ data: Data) throws {
