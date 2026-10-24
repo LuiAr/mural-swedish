@@ -51,3 +51,14 @@ The installed app was built from tested code revision `d6e18b86e9a7106294d926722
 Local evidence: `/private/tmp/mural-build8-swift.log`, `/private/tmp/mural-build8-seven-ui.xcresult`, `/private/tmp/mural-build8-device-fresh-signed.log`, `/private/tmp/mural-build8-device-fresh/Build/Products/Release-iphoneos/Mural.app` (signed), `/private/tmp/mural-build8-install.json` and `/private/tmp/mural-build8-installed-after.json`. Earlier failed signing and unsigned compile logs are retained separately.
 
 PR #5 remains a draft and main remains unchanged. No server deployment is required for the personal-key study paths. Physical voice availability and speaker/headphone routing remain unverified.
+
+
+## PR review and main delivery candidate — 24 October 2026
+
+Reviewed the full PR against refreshed `origin/main` (`2ff10a8`): study models and validation, legacy/schema-2 archive compatibility, import and deletion behavior, source-revision invalidation, explicit consent and personal-key request boundaries, cancellation, playback ownership, SwiftUI presentation, offline fixtures, Kotlin archive counterparts and workflow assertions. No blocking product-code issue was found. The four visible features are normal/slow saved-word and example listening, daily active recall, source-grounded recap with typed retry, and cached Swedish noun/verb forms in scrollable word details. Full-width word rows open details. Talk retains its layout; the disabled hosted path needs no server deployment.
+
+The documentation-only `3dc5efe` CI run repeated the flashcard boundary-page timeout while its later diagnostic snapshot still showed the expected page. The ten-second KVC expectation therefore was not sufficient. The helper now reads a fresh accessibility snapshot first and re-queries the pager in its block predicate while waiting for a changed page. Exact page, short-drag, boundary, vertical-scroll, full-deck and row-center assertions remain intact; all seven offline UI checks remain in the workflow.
+
+The next delivery is Mural 1.0 build 9, synchronized in the Xcode project and generator. Local verification passed all 244 Swift Core tests, 89 Python tooling tests, generated-content/cross-platform checks and all seven offline native UI checks with zero failures or skips. The signed Release candidate passed strict deep signature verification and retained the personal bundle, team and disabled Sign in with Apple capability. Installation is held until the reviewed PR is merged; the merged-main build and physical device readback will be recorded in the PR handover. No live provider calls or purchases were used. Physical voice availability and speaker/headphone routing remain unverified.
+
+Local review evidence: `/private/tmp/mural-build9-swift.log`, `/private/tmp/mural-build9-python.log`, `/private/tmp/mural-build9-seven-ui.xcresult`, `/private/tmp/mural-build9-device.log` and `/private/tmp/mural-build9-device/Build/Products/Release-iphoneos/Mural.app`.

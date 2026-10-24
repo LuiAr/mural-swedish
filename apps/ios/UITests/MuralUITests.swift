@@ -304,9 +304,17 @@ final class MuralUITests: XCTestCase {
     }
 
     private func waitForFlashcardPage(_ value: String, in pager: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: pager)
-        // A loaded simulator can take longer to publish the settled accessibility
-        // snapshot after a boundary spring. Keep the exact page assertion.
+        // Boundary gestures keep the value unchanged. Read a fresh snapshot first
+        // instead of depending on KVC polling of a previously resolved element.
+        let app = XCUIApplication()
+        func currentPager() -> XCUIElement {
+            app.descendants(matching: .any)["flashcard-pager"].firstMatch
+        }
+        if currentPager().value as? String == value { return }
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let current = currentPager()
+            return current.exists && current.value as? String == value
+        }, object: nil)
         let result = XCTWaiter.wait(for: [changed], timeout: 10)
         if result != .completed {
             print("Flashcard expected \(value); actual \(String(describing: pager.value))")
