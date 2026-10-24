@@ -25,3 +25,25 @@ Review grades, generated recaps and word-form cards stay separate from transcrip
 Listening uses installed iPhone voices. Recap/form generation is explicit and uses the app's existing personal key and AI-processing permission. Cached material works offline. These features add no hosted API contracts, migrations, accounts or purchase activation, so no server deployment is required.
 
 See the [study tool guide](../docs/study-tools.md) for navigation, playback behavior, review intervals and generated-content limits.
+
+## Owner Mac verification — 24 October 2026
+
+The Mac checked out candidate `458c5ff313d26fe1e40c4af44b95e351e8bd3a84` in an isolated worktree based on current `origin/main` (`2ff10a8`). The original dirty checkout, its untracked files and private `Local.xcconfig` were preserved; hashes of all 27 local/private files remained unchanged.
+
+Final results for that exact candidate:
+
+- [Checks run 40076412429](https://github.com/LuiAr/mural-swedish/actions/runs/40076412429): Swift Core and server passed (244 and 533 tests); Simulator and unsigned iPhone Release builds passed. Native UI passed six of seven checks. Swedish forms passed; the flashcard boundary-page assertion exceeded its three-second accessibility wait, although the subsequent diagnostic tree reported the expected `1 of 4` value.
+- [Android run 40076412405](https://github.com/LuiAr/mural-swedish/actions/runs/40076412405): unit tests, lint, builds, release validation and all 94 emulator tests passed. Contracts and secret scanning also passed on this candidate.
+
+Local Xcode 27.1 / iOS 27 Simulator checks:
+
+- All 244 Swift Core tests passed with zero failures.
+- The unchanged flashcard gesture test passed locally. Its exact-page wait was then increased from three to ten seconds for loaded CI simulators. No page, short-drag, boundary, vertical-scroll, full-deck or word-form assertion was removed or weakened; the slow short drag still ends with a stationary release, and word details still open through the real row-center tap.
+- All seven targeted offline UI checks passed together after the timing adjustment, with zero failures or skips. Preview storage and fixed recap/forms/pronunciation responses kept these checks offline. The workflow retains all seven checks.
+- The iPhone Release compilation passed with the owner's existing private configuration. The artifact reports `louisar.mural.swedish`, version `1.0`, build `8`. Managed accounts, Apple/Google sign-in and Apple purchases remain disabled, and the managed API URL is empty.
+
+Physical delivery is blocked by Apple signing. The paired iPhone 17 Pro was connected, and device readback confirmed the existing `louisar.mural.swedish` version `1.0`, build `7`. The signed build failed with `No Accounts` and no development provisioning profile for that identifier. Xcode's account inventory is empty; the available profile belongs to another app and cannot sign Mural. The remaining step is to sign in or refresh the owner's existing Apple Account in Xcode Settings → Accounts, then rebuild using the same team and identifier, verify the strict deep signature, install over the existing app and read back build 8. No installation, app launch, live provider request, purchase, key change, uninstall or reset was performed.
+
+Local evidence: `/private/tmp/mural-build8-swift.log`, `/private/tmp/mural-build8-seven-ui.xcresult`, `/private/tmp/mural-build8-device.log` (signing failure), `/private/tmp/mural-build8-device-unsigned.log` (successful compilation), and `/private/tmp/mural-build8-device/Build/Products/Release-iphoneos/Mural.app` (currently unsigned).
+
+PR #5 remains a draft and main remains unchanged. No server deployment is required for the personal-key study paths. Physical voice availability and speaker/headphone routing remain unverified.
