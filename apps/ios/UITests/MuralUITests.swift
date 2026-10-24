@@ -1134,6 +1134,90 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(access.label.contains("Mural minutes"))
     }
 
+    private func openWhatsNew(accessibility: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview", "--preview-key"]
+        if accessibility {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        app.launch()
+        XCTAssertTrue(app.buttons["start-conversation"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.navigationBars["What’s New"].exists)
+        app.buttons["Settings"].tap()
+        let menu = app.buttons["settings-whats-new"]
+        for _ in 0..<10 {
+            if menu.exists && menu.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(menu.isHittable)
+        menu.tap()
+        XCTAssertTrue(app.navigationBars["What’s New"].waitForExistence(timeout: 5))
+        return app
+    }
+
+    func testWhatsNewShowsInstalledBuildAndRecentChanges() {
+        let app = openWhatsNew()
+        let installed = app.staticTexts["whats-new-installed-build"]
+        XCTAssertTrue(installed.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["whats-new-current-title"].value as? String,
+                       installed.label.replacingOccurrences(of: "Mural ", with: "Version "))
+        XCTAssertFalse(app.staticTexts["whats-new-current-title"].label.isEmpty)
+        let header = XCTAttachment(screenshot: app.screenshot())
+        header.name = "What’s New - installed build"; header.lifetime = .keepAlways; add(header)
+        let viewport = app.scrollViews["whats-new-scroll"]
+        let previous = app.buttons["whats-new-history-9"]
+        for _ in 0..<10 {
+            if previous.exists && previous.isHittable { break }
+            viewport.swipeUp()
+        }
+        XCTAssertTrue(previous.isHittable)
+        previous.tap()
+        XCTAssertTrue(app.navigationBars["Build 9"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["whats-new-release-build"].label, "Version 1.0 · Build 9")
+        let forms = app.descendants(matching: .any)["whats-new-feature-9-swedish-forms"].firstMatch
+        for _ in 0..<10 {
+            if forms.exists && forms.isHittable { break }
+            app.scrollViews["whats-new-scroll"].swipeUp()
+        }
+        XCTAssertTrue(forms.isHittable)
+        XCTAssertTrue(forms.label.contains("Swedish forms"))
+        let history = XCTAttachment(screenshot: app.screenshot())
+        history.name = "What’s New - earlier study update"; history.lifetime = .keepAlways; add(history)
+        app.navigationBars["Build 9"].buttons["What’s New"].tap()
+        app.navigationBars["What’s New"].buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["start-conversation"].waitForExistence(timeout: 3))
+    }
+
+    func testWhatsNewRemainsReadableAtAccessibilitySizes() {
+        let app = openWhatsNew(accessibility: true)
+        let previous = app.buttons["whats-new-history-9"]
+        for _ in 0..<16 {
+            if previous.exists && previous.isHittable { break }
+            app.scrollViews["whats-new-scroll"].swipeUp()
+        }
+        XCTAssertTrue(previous.isHittable)
+        previous.tap()
+        XCTAssertTrue(app.navigationBars["Build 9"].waitForExistence(timeout: 3))
+        let viewport = app.scrollViews["whats-new-scroll"]
+        let footer = app.staticTexts["whats-new-footer"]
+        for _ in 0..<16 {
+            if footer.exists && footer.isHittable { break }
+            viewport.swipeUp()
+        }
+        XCTAssertTrue(footer.isHittable)
+        let forms = app.descendants(matching: .any)["whats-new-feature-9-swedish-forms"].firstMatch
+        XCTAssertTrue(forms.exists)
+        XCTAssertGreaterThan(forms.frame.maxY, viewport.frame.minY)
+        XCTAssertGreaterThanOrEqual(forms.frame.minX, 0)
+        XCTAssertLessThanOrEqual(forms.frame.maxX, app.frame.maxX)
+        XCTAssertLessThanOrEqual(forms.frame.maxY, viewport.frame.maxY + 1)
+        XCTAssertTrue(app.navigationBars["Build 9"].buttons["What’s New"].isHittable)
+        let screen = XCTAttachment(screenshot: app.screenshot())
+        screen.name = "What’s New - largest accessibility text"; screen.lifetime = .keepAlways; add(screen)
+    }
+
     func testSettingsKeepLicensesInNoticesWithoutTransportDetails() {
         let app = launch()
         app.buttons["Settings"].tap()

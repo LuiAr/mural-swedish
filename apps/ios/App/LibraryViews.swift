@@ -444,6 +444,11 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings-privacy-policy")
                     Link("Terms of use", destination: URL(string: "https://mural.chat/terms/")!)
                         .accessibilityIdentifier("settings-terms")
+                    NavigationLink {
+                        WhatsNewView()
+                    } label: {
+                        LabeledContent("What’s New", value: InstalledAppVersion.buildLabel)
+                    }.accessibilityIdentifier("settings-whats-new")
                     NavigationLink("About Mural") { AboutMuralView() }
                 }
             }
@@ -693,8 +698,8 @@ private struct AboutMuralView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
+                LabeledContent("Version", value: InstalledAppVersion.version)
+                LabeledContent("Build", value: InstalledAppVersion.build)
                     .accessibilityIdentifier("app-build-number")
                 Link("AI Data Controls", destination: URL(string: "https://developers.openai.com/api/docs/guides/your-data")!)
                 Button("Open-source notices") { notices = true }
