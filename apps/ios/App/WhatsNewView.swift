@@ -10,104 +10,112 @@ enum InstalledAppVersion {
 struct WhatsNewView: View {
     private let release: AppReleaseNote?
     init(release: AppReleaseNote? = nil) { self.release = release }
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 42
+    @State private var previousRelease: AppReleaseNote?
+
     private var current: AppReleaseNote? {
         release ?? AppReleaseNotes.current(version: InstalledAppVersion.version, build: InstalledAppVersion.build)
     }
     private var history: [AppReleaseNote] { AppReleaseNotes.history(beforeBuild: InstalledAppVersion.build) }
+    private func identifier(_ base: String) -> String { release.map { "\(base)-\($0.build)" } ?? base }
+    private var buildHeading: String {
+        release.map { "Mural \($0.version) · Build \($0.build)" }
+            ?? "Mural \(InstalledAppVersion.version) · \(InstalledAppVersion.buildLabel)"
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                VStack(alignment: .leading, spacing: 14) {
-                    Image(systemName: "sparkles")
-                        .font(.system(.largeTitle, design: .rounded, weight: .medium))
-                        .foregroundStyle(MuralColor.ink).padding(18)
-                        .background(MuralColor.peach, in: RoundedRectangle(cornerRadius: 22))
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    Image("ReleaseAppIcon").resizable().scaledToFit()
+                        .frame(width: 40, height: 40).clipShape(RoundedRectangle(cornerRadius: 10))
                         .accessibilityHidden(true)
-                    if let release {
-                        Text("Version \(release.version) · Build \(release.build)")
-                            .font(.subheadline).foregroundStyle(MuralColor.secondary)
-                            .accessibilityIdentifier("whats-new-release-build")
-                    } else {
-                        Text("Mural \(InstalledAppVersion.version) · \(InstalledAppVersion.buildLabel)")
-                            .font(.subheadline).foregroundStyle(MuralColor.secondary)
-                            .accessibilityIdentifier("whats-new-installed-build")
-                    }
-                    Text(current?.name ?? "Your Mural updates")
-                        .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityValue(current.map { "Version \($0.version) · Build \($0.build)" } ?? "")
-                        .accessibilityIdentifier("whats-new-current-title")
-                    if let current {
-                        Text(current.date).font(.caption).foregroundStyle(MuralColor.secondary)
-                    }
+                    Text(buildHeading).font(.headline).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(release == nil ? "whats-new-installed-build" : "whats-new-release-build")
                 }
+                .padding(.trailing, 58).padding(.top, 18).padding(.bottom, 34)
 
+                Text(current?.name ?? "Your Mural updates")
+                    .font(.system(size: titleSize, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityValue(current.map { "Version \($0.version) · Build \($0.build)" } ?? "")
+                    .accessibilityIdentifier(identifier("whats-new-current-title"))
+                Text(current?.summary ?? "Notes for this build aren’t available yet.")
+                    .font(.title3).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
                 if let current {
-                    highlights(current)
-                } else {
-                    Text("Notes for this build aren’t available yet. You can still read earlier updates below.")
-                        .foregroundStyle(MuralColor.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(current.date).font(.caption).foregroundStyle(.secondary).padding(.top, 14)
+                    VStack(alignment: .leading, spacing: 32) {
+                        ForEach(current.highlights) { highlight in
+                            VStack(alignment: .leading, spacing: 12) {
+                                ReleaseFeatureArtwork(featureID: highlight.id)
+                                    .accessibilityHidden(true).allowsHitTesting(false)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(highlight.title).font(.title3.weight(.bold))
+                                        .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+                                        .accessibilityIdentifier("whats-new-heading-\(current.build)-" + highlight.id)
+                                    Text(highlight.detail).font(.body).foregroundStyle(.secondary).lineSpacing(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }.padding(.horizontal, 10)
+                            }
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("whats-new-feature-\(current.build)-" + highlight.id)
+                        }
+                    }.padding(.top, 32)
                 }
 
                 if release == nil && !history.isEmpty {
-                    VStack(alignment: .leading, spacing: 24) {
-                        Text("Previous updates")
-                            .font(.system(.title2, design: .rounded, weight: .semibold))
-                            .accessibilityAddTraits(.isHeader)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Previous updates").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                            .padding(.bottom, 8)
                         ForEach(history) { release in
-                            NavigationLink {
-                                WhatsNewView(release: release)
-                            } label: {
+                            Button { previousRelease = release } label: {
                                 HStack(spacing: 16) {
-                                    VStack(alignment: .leading, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 6) {
                                         Text(release.name).font(.headline)
-                                            .fixedSize(horizontal: false, vertical: true)
                                         Text("Version \(release.version) · Build \(release.build) · \(release.date)")
-                                            .font(.caption).foregroundStyle(MuralColor.secondary)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }.fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                     Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                                        .foregroundStyle(MuralColor.secondary).accessibilityHidden(true)
-                                }
-                                .padding(22).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 24))
-                                .contentShape(RoundedRectangle(cornerRadius: 24))
+                                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                                }.padding(.vertical, 16).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("whats-new-history-\(release.build)")
+                            Divider()
                         }
-                    }
+                    }.padding(.top, 40)
                 }
 
-                Text("Available offline. Come back whenever you’d like a reminder.")
-                    .font(.footnote).foregroundStyle(MuralColor.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("whats-new-footer")
+                Text("Available offline.").font(.footnote).foregroundStyle(.secondary)
+                    .padding(.top, 28).padding(.bottom, 40)
+                    .accessibilityIdentifier(identifier("whats-new-footer"))
             }
-            .padding(26).frame(maxWidth: 620, alignment: .leading).frame(maxWidth: .infinity)
+            .padding(.horizontal, 24).frame(maxWidth: 620, alignment: .leading).frame(maxWidth: .infinity)
         }
-        .accessibilityIdentifier("whats-new-scroll")
-        .background(MuralColor.cream).foregroundStyle(MuralColor.ink)
-        .navigationTitle(release.map { "Build \($0.build)" } ?? "What’s New").navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier(identifier("whats-new-scroll"))
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea()).foregroundStyle(.primary)
+        .overlay(alignment: .topTrailing) {
+            Group {
+                if reduceTransparency {
+                    closeButton.background(Color(uiColor: .systemBackground), in: Circle())
+                        .overlay(Circle().strokeBorder(.secondary.opacity(0.2)))
+                } else {
+                    closeButton.glassEffect(.regular.interactive(), in: .circle)
+                }
+            }.padding(.trailing, 18).padding(.top, 12)
+        }
+        .fullScreenCover(item: $previousRelease) { WhatsNewView(release: $0) }
     }
 
-    private func highlights(_ release: AppReleaseNote) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
-            ForEach(release.highlights) { highlight in
-                HStack(alignment: .top, spacing: 16) {
-                    Image(systemName: highlight.symbol).font(.title3).foregroundStyle(MuralColor.ink)
-                        .frame(width: 28).padding(.top, 2).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(highlight.title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                        Text(highlight.detail).font(.subheadline).foregroundStyle(MuralColor.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("whats-new-feature-\(release.build)-" + highlight.id)
-            }
+    private var closeButton: some View {
+        Button { dismiss() } label: {
+            Image(systemName: "xmark").font(.system(size: 22, weight: .regular))
+                .foregroundStyle(.primary).frame(width: 48, height: 48).contentShape(Circle())
         }
-        .padding(22).frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 24))
+        .buttonStyle(.plain).accessibilityLabel("Close What’s New")
+        .accessibilityIdentifier(identifier("whats-new-close"))
     }
 }

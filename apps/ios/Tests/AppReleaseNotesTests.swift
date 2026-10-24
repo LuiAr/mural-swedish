@@ -27,6 +27,7 @@ final class AppReleaseNotesTests: XCTestCase {
             XCTAssertGreaterThan(release.build, 0)
             XCTAssertFalse(release.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             XCTAssertFalse(release.date.isEmpty)
+            XCTAssertFalse(release.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             XCTAssertFalse(release.highlights.isEmpty)
             XCTAssertEqual(Set(release.highlights.map(\.id)).count, release.highlights.count)
             for item in release.highlights {
