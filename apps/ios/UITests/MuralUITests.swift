@@ -305,7 +305,12 @@ final class MuralUITests: XCTestCase {
 
     private func waitForFlashcardPage(_ value: String, in pager: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: pager)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed, "Flashcard did not reach \(value)", file: file, line: line)
+        let result = XCTWaiter.wait(for: [changed], timeout: 3)
+        if result != .completed {
+            print("Flashcard expected \(value); actual \(String(describing: pager.value))")
+            print(XCUIApplication().debugDescription)
+        }
+        XCTAssertEqual(result, .completed, "Flashcard did not reach \(value)", file: file, line: line)
     }
 
     private func waitForLabel(_ value: String, in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
@@ -318,6 +323,7 @@ final class MuralUITests: XCTestCase {
             if element.isHittable { return }
             app.swipeUp()
         }
+        if !element.isHittable { print(app.debugDescription) }
         XCTAssertTrue(element.isHittable)
     }
 
@@ -1464,26 +1470,25 @@ final class MuralUITests: XCTestCase {
         let book = app.buttons["word-row-sv|en bok|book"]
         XCTAssertTrue(book.waitForExistence(timeout: 10))
         book.tap()
+        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
         let generate = app.buttons["generate-word-forms"]
-        XCTAssertTrue(generate.waitForExistence(timeout: 5))
         revealStudyControl(generate, in: app)
         generate.tap()
         let plural = app.staticTexts["word-form-indefinitePlural"]
-        XCTAssertTrue(plural.waitForExistence(timeout: 5))
         revealStudyControl(plural, in: app)
         XCTAssertEqual(plural.label, "böcker")
         let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish noun forms"; capture.lifetime = .keepAlways; add(capture)
         app.buttons["close-word-details"].tap()
         book.tap()
-        XCTAssertTrue(plural.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
+        revealStudyControl(plural, in: app)
         XCTAssertFalse(app.buttons["generate-word-forms"].exists)
         app.buttons["close-word-details"].tap()
         app.buttons["word-row-sv|att läsa|to read"].tap()
-        XCTAssertTrue(generate.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
         revealStudyControl(generate, in: app)
         generate.tap()
         let past = app.staticTexts["word-form-past"]
-        XCTAssertTrue(past.waitForExistence(timeout: 5))
         revealStudyControl(past, in: app)
         XCTAssertEqual(past.label, "läste")
     }
