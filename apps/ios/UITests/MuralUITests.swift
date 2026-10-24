@@ -1604,7 +1604,10 @@ final class MuralUITests: XCTestCase {
         let card = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         let shortDrag = card
         let start = shortDrag.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -24, dy: 0)))
+        // The default 500-point/s drag is a flick and can legitimately page
+        // through predicted velocity. Release a slow, stationary short drag.
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -24, dy: 0)),
+                    withVelocity: .slow, thenHoldForDuration: 0.3)
         waitForFlashcardPage("1 of 4", in: progress)
         shortDrag.swipeRight()
         waitForFlashcardPage("1 of 4", in: progress)
