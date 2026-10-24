@@ -133,7 +133,7 @@ struct WordsView: View {
                                     }
                                     Spacer(minLength: 10)
                                     VStack(alignment: .trailing, spacing: 8) { RecallBars(count: word.bars); Text(word.label).font(.caption2).foregroundStyle(MuralColor.secondary) }
-                                }.padding(.vertical, 20)
+                                }.padding(.vertical, 20).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("word-row-" + word.id)
                             Divider().overlay(MuralColor.peach)
                         }

@@ -327,6 +327,13 @@ final class MuralUITests: XCTestCase {
         XCTAssertTrue(element.isHittable)
     }
 
+    private func openWord(_ word: XCUIElement, in app: XCUIApplication) {
+        word.tap()
+        let presented = app.buttons["close-word-details"].waitForExistence(timeout: 5)
+        if !presented { print(app.debugDescription) }
+        XCTAssertTrue(presented)
+    }
+
     private func confirmAdult(in app: XCUIApplication) {
         let control = app.switches["onboarding-adult-confirmation"]
         XCTAssertTrue(control.exists)
@@ -1469,8 +1476,7 @@ final class MuralUITests: XCTestCase {
         app.launch()
         let book = app.buttons["word-row-sv|en bok|book"]
         XCTAssertTrue(book.waitForExistence(timeout: 10))
-        book.tap()
-        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
+        openWord(book, in: app)
         let generate = app.buttons["generate-word-forms"]
         revealStudyControl(generate, in: app)
         generate.tap()
@@ -1479,13 +1485,11 @@ final class MuralUITests: XCTestCase {
         XCTAssertEqual(plural.label, "böcker")
         let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "Swedish noun forms"; capture.lifetime = .keepAlways; add(capture)
         app.buttons["close-word-details"].tap()
-        book.tap()
-        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
+        openWord(book, in: app)
         revealStudyControl(plural, in: app)
         XCTAssertFalse(app.buttons["generate-word-forms"].exists)
         app.buttons["close-word-details"].tap()
-        app.buttons["word-row-sv|att läsa|to read"].tap()
-        XCTAssertTrue(app.buttons["close-word-details"].waitForExistence(timeout: 5))
+        openWord(app.buttons["word-row-sv|att läsa|to read"], in: app)
         revealStudyControl(generate, in: app)
         generate.tap()
         let past = app.staticTexts["word-form-past"]
