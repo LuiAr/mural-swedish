@@ -27,7 +27,7 @@ jobs:
           xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural
           -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/mural-native-checks
           CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
-      - name: Verify offline vocabulary interface
+      - name: Verify offline study and update interfaces
         run: >-
           xcodebuild -project apps/ios/Mural.xcodeproj -scheme Mural
           -destination 'platform=iOS Simulator,name=iPhone 17'
@@ -40,7 +40,9 @@ jobs:
           -only-testing:MuralUITests/MuralUITests/testSwedishWordFormsCacheNounsAndVerbs
           -only-testing:MuralUITests/MuralUITests/testFlashcardsRevealNavigateAndIgnoreVerticalSwipes
           -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
-          -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test
+          -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards
+          -only-testing:MuralUITests/MuralUITests/testWhatsNewShowsInstalledBuildAndRecentChanges
+          -only-testing:MuralUITests/MuralUITests/testWhatsNewRemainsReadableAtAccessibilitySizes test
       - name: Build iPhone release without signing
         if: success() || failure()
         run: >-

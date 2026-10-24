@@ -86,6 +86,7 @@ A free Personal Team can run the app on your own phone; TestFlight and App Store
 - **A fresh start:** the Talk screen returns to its greeting 15 seconds after a conversation ends. Tap **New conversation** to reset immediately. Your saved conversations and learning remain.
 - **Local records:** export or import a JSON learning backup, delete a conversation, or delete all learning data from Settings.
 - **iPhone study tools:** hear saved words and sentences at normal or slower speed, practise a short daily recall queue, create a conversation recap with a retry, and look up Swedish noun and verb forms. [Study tool guide](docs/study-tools.md).
+- **What’s New:** Settings shows the installed build, a named update and earlier release notes, available offline. [Release-note guide](docs/whats-new.md).
 
 The modules teach Norwegian Bokmål with an Eastern Norwegian voice target, Spanish from Spain, international English, French from France, German from Germany, Italian from Italy, Brazilian Portuguese, Standard Mandarin with Simplified Chinese, Standard Serbian (Ekavian, Latin script), Modern Standard Greek from Greece, Tagalog/Filipino from the Philippines Standard Swedish from Sweden, Dutch from the Netherlands and Standard Russian. Each language has its own conversation themes, teaching guidance and progress. Valid regional alternatives are accepted; Serbian also accepts Cyrillic input. See the [new language guidance](docs/serbian-greek-tagalog.md) for writing, pronunciation and vocabulary rules.
 

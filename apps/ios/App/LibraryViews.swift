@@ -353,6 +353,7 @@ struct SettingsView: View {
     @State private var showingHostedSwitch = false
     @State private var showingAccount = false
     @State private var showingAIProcessing = false
+    @State private var showingWhatsNew = false
     private var store: LearningStore { coordinator.store }
 
     var body: some View {
@@ -444,6 +445,15 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings-privacy-policy")
                     Link("Terms of use", destination: URL(string: "https://mural.chat/terms/")!)
                         .accessibilityIdentifier("settings-terms")
+                    Button {
+                        showingWhatsNew = true
+                    } label: {
+                        HStack {
+                            LabeledContent("What’s New", value: InstalledAppVersion.buildLabel)
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary).accessibilityHidden(true)
+                        }.contentShape(Rectangle())
+                    }.accessibilityIdentifier("settings-whats-new")
                     NavigationLink("About Mural") { AboutMuralView() }
                 }
             }
@@ -465,6 +475,7 @@ struct SettingsView: View {
             }
             }
         }
+        .fullScreenCover(isPresented: $showingWhatsNew) { WhatsNewView() }
         .sheet(isPresented: $showingKey, onDismiss: {
             if coordinator.requestHostedSwitch {
                 coordinator.requestHostedSwitch = false
@@ -693,8 +704,8 @@ private struct AboutMuralView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
+                LabeledContent("Version", value: InstalledAppVersion.version)
+                LabeledContent("Build", value: InstalledAppVersion.build)
                     .accessibilityIdentifier("app-build-number")
                 Link("AI Data Controls", destination: URL(string: "https://developers.openai.com/api/docs/guides/your-data")!)
                 Button("Open-source notices") { notices = true }

@@ -65,6 +65,12 @@ The Checks, Contracts and Android GitHub workflows support manual `workflow_disp
 
 Settings → About Mural shows Version and Build from the running app’s `CFBundleShortVersionString` and `CFBundleVersion`; never hardcode the displayed build. Keep `CURRENT_PROJECT_VERSION` aligned in the Xcode project and `scripts/generate_project.py`, and read back the installed version after a phone update. This display is local and needs no server deployment.
 
+## What’s New release notes
+
+Every iPhone delivery build must add a named, dated entry to `apps/ios/Core/AppReleaseNotes.swift`, with a short summary, concise user-facing highlights and where to find the changes. Keep shipped entries, newest first; build numbers increase across versions. Update the Xcode project and generator together. `testShippingBuildMustHaveMatchingNotesAndGeneratorMetadata` rejects a build bump without a matching release entry.
+
+Settings → What’s New is a permanent, offline, read-only menu. Its installed version/build come from `Bundle.main`, and the current name must match that exact version/build; never label older notes as the current release or show future builds in history. Use the full-screen editorial layout: app/build header, large title and summary, rounded static feature illustrations followed by scalable captions, and a pinned close button. Previous updates open their own full-screen page and close back to the parent. Illustrations use fixed examples and Mural’s own branding, never playback, provider calls or owner data. When an update showcases existing tools, say so in the summary rather than presenting them as newly shipped features. Keep Talk minimal and do not add automatic release-note pop-ups, consent prompts, tracking, API calls, archive fields or Keychain writes. This UI and bundled metadata need no server deployment or Android archive change. Verify the normal navigation and largest accessibility text with `testWhatsNewShowsInstalledBuildAndRecentChanges` and `testWhatsNewRemainsReadableAtAccessibilitySizes`, using offline previews only.
+
 ## Hosted closeout evidence and monitoring
 
 Upstream PR #168 adds immutable final voice usage evidence and durable reconciliation health. Preserve the Swedish `sv-SE` provider entry when integrating upstream backend changes. A source integration does not enable hosted accounts, sign-in, purchases or managed API access in the owner's personal-key app, and needs no deployment for that app's disabled hosted path.
