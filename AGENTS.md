@@ -8,6 +8,8 @@ At the start of each Mural coding task, fetch `origin/main` and base new branch 
 
 After finishing an authorized Mural update, attempt a signed iPhone build and install it over the owner's existing app by default, including backend-only source updates, unless the user says otherwise. Preserve the existing bundle identifier, signing team, personal-key settings, learning data and Keychain; never uninstall or reset to refresh a build. Increment the delivery build number in both the Xcode project and generator, and read back the installed version and build from the physical phone. If the phone, pairing or signing is unavailable, finish the build where possible and report the exact remaining step. This default authorizes build and installation, not launching the app, starting voice calls, making purchases or other billable checks.
 
+In an isolated worktree, copy the owner's existing private `Local.xcconfig` byte-for-byte to `apps/ios/Config/Local.xcconfig` only when absent, and confirm Git ignores it. If automatic provisioning requests capabilities that contradict the resolved personal settings, retry with that local include and fresh isolated DerivedData. Verify the actual bundle, team, entitlements and disabled hosted features before installation; never track the private configuration.
+
 A sandboxed `codesign --verify --deep --strict` can fail with `CSSMERR_TP_NOT_TRUSTED` when macOS trust-store access is unavailable. Retry with the required trust access and confirm successful verification; do not bypass signature checks or treat the sandbox result alone as an invalid signing certificate.
 
 ## Keep Talk minimal
