@@ -1593,6 +1593,13 @@ final class MuralUITests: XCTestCase {
         let progress = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         XCTAssertTrue(progress.waitForExistence(timeout: 5))
         waitForFlashcardPage("1 of 4", in: progress)
+        // Check reveal before gestures: a boundary swipe leaves the page value
+        // unchanged while the intentional post-drag tap guard is still active.
+        let originalWord = app.staticTexts["flashcard-word"].label
+        app.buttons["reveal-flashcard"].tap()
+        XCTAssertTrue(app.staticTexts["flashcard-meaning"].waitForExistence(timeout: 3))
+        app.buttons["reveal-flashcard"].tap()
+        XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         let card = app.descendants(matching: .any)["flashcard-pager"].firstMatch
         let shortDrag = card
@@ -1603,12 +1610,6 @@ final class MuralUITests: XCTestCase {
         waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertFalse(app.buttons["Previous word"].exists)
         XCTAssertFalse(app.staticTexts["flashcard-progress"].exists)
-        XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
-        let originalWord = app.staticTexts["flashcard-word"].label
-        app.buttons["reveal-flashcard"].tap()
-        XCTAssertTrue(app.staticTexts["flashcard-meaning"].waitForExistence(timeout: 3))
-        if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
-        app.buttons["reveal-flashcard"].tap()
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
         if ProcessInfo.processInfo.environment["MURAL_EXPERIENCE_RECORDING"] == "1" { Thread.sleep(forTimeInterval: 1.5) }
         card.swipeLeft()
@@ -1623,7 +1624,10 @@ final class MuralUITests: XCTestCase {
         waitForFlashcardPage("1 of 4", in: progress)
         XCTAssertEqual(app.staticTexts["flashcard-word"].label, originalWord)
         XCTAssertFalse(app.staticTexts["flashcard-meaning"].exists)
-        for _ in 0..<3 { card.swipeLeft() }
+        for page in 2...4 {
+            card.swipeLeft()
+            waitForFlashcardPage("\(page) of 4", in: progress)
+        }
         waitForFlashcardPage("4 of 4", in: progress)
         card.swipeLeft()
         waitForFlashcardPage("4 of 4", in: progress)

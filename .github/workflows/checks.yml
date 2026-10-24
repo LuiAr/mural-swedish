@@ -29,7 +29,7 @@ jobs:
           CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
       - name: Verify offline vocabulary interface
         run: >-
-          xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural
+          xcodebuild -project apps/ios/Mural.xcodeproj -scheme Mural
           -destination 'platform=iOS Simulator,name=iPhone 17'
           -derivedDataPath /tmp/mural-native-checks CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
           -resultBundlePath /tmp/mural-native-results.xcresult
@@ -42,6 +42,7 @@ jobs:
           -only-testing:MuralUITests/MuralUITests/testFlashcardsLargeTextAndLanguageIsolation
           -only-testing:MuralUITests/MuralUITests/testFlashcardLongMeaningScrollsWithoutChangingCards test
       - name: Build iPhone release without signing
+        if: success() || failure()
         run: >-
           xcodebuild -quiet -project apps/ios/Mural.xcodeproj -scheme Mural -configuration Release
           -destination 'generic/platform=iOS' -derivedDataPath /tmp/mural-native-checks
@@ -50,6 +51,7 @@ jobs:
         if: always()
         run: |
           if [[ -d /tmp/mural-native-results.xcresult ]]; then
+            xcrun xcresulttool get test-results summary --path /tmp/mural-native-results.xcresult
             xcrun xcresulttool export attachments --path /tmp/mural-native-results.xcresult --output-path /tmp/mural-native-screenshots
           fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
