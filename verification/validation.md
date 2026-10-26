@@ -1,5 +1,7 @@
 # Build verification
 
+26 October 2026: [Upstream maintenance and build 12](upstream-maintenance-2026-10-26.md) records the approved Apple history and monitor-source integration with no alert exceptions enabled, named build-12 metadata, 248 Core/91 tooling tests and two offline release-page UI checks. The integration PR records full PostgreSQL validation separately; signed delivery and installed-device readback are separate evidence.
+
 15 October 2026: [Personal iPhone build 7 delivery](ios-personal-delivery-2026-10-15.md) records the signed device build, successful installation and physical iPhone readback of Mural 1.0 (7). AGENTS.md and the weekly upstream-review automation now include the owner's default build/install attempt after authorized updates. No app launch, billable call or server deployment was performed.
 
 15 October 2026: [Hosted closeout source integration](backend-closeout-2026-10-15.md) records upstream PR #168, preserved Swedish and personal-key configuration, the account-load fixture cleanup fix, offline checks and PostgreSQL CI evidence. This backend source update does not require an app install or deployment for the owner's disabled hosted path.

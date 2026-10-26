@@ -21,6 +21,11 @@ public struct AppReleaseNote: Identifiable, Equatable, Sendable {
 public enum AppReleaseNotes {
     /// Keep every shipped entry, newest first. Build numbers increase across versions.
     public static let all: [AppReleaseNote] = [
+        AppReleaseNote(version: "1.0", build: 12, name: "Keeping things steady", date: "26 October 2026",
+            summary: "A maintenance release. Your personal-key conversations and existing study tools work as before.", highlights: [
+            AppReleaseHighlight(id: "whats-new", symbol: "checkmark.shield", title: "A little maintenance",
+                detail: "Your personal-key setup, saved words and conversations stay as they are. Open earlier updates below to revisit the study tools already in Mural.")
+        ]),
         AppReleaseNote(version: "1.0", build: 11, name: "Make every word stick", date: "24 October 2026",
             summary: "A new look for What’s New, with a closer look at the study tools already in Mural.", highlights: [
             AppReleaseHighlight(id: "listening", symbol: "speaker.wave.2", title: "Listen. Then listen closer.",

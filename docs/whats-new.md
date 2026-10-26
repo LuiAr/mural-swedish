@@ -2,6 +2,7 @@
 
 Open **Settings → What’s New** to see the installed version and build, the release name and its highlights. Choose an earlier update to read its notes. The screen is available offline and does not interrupt Talk or appear automatically after installation.
 
+- **1.0 build 12 — Keeping things steady:** records upstream backend maintenance while the personal-key conversation and study tools stay unchanged.
 - **1.0 build 11 — Make every word stick:** introduces the illustrated, full-screen update page and showcases four existing study tools.
 - **1.0 build 10 — Updates at a glance:** introduces this menu and release history.
 - **1.0 build 9 — More ways to practise:** saved-word/example listening, daily recall, conversation recap with typed retry, and cached Swedish noun/verb forms.
