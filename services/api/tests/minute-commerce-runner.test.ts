@@ -98,7 +98,10 @@ integration('Apple finishes a recent paginated window when the clock advances be
   const f=await fixture(),started=Date.now();let now=started;
   const clock=mock.method(Date,'now',()=>now),calls:Array<{start:number;end:number;token?:string}>=[];
   try {
-    await f.db.query("INSERT INTO apple_notification_cursors(environment,merchant,completed_through_ms) VALUES('live','chat.mural.ios',$1)",[started-600_000]);
+    // PostgreSQL's default now() keeps advancing while Date.now is frozen here.
+    // Make the fixture explicitly due under that clock, even on a slow runner.
+    await f.db.query("INSERT INTO apple_notification_cursors(environment,merchant,completed_through_ms,next_poll_after) VALUES('live','chat.mural.ios',$1,$2)",
+      [started-600_000,new Date(started-1_000)]);
     const cursor=new AppleHistoryReconciler(f.db,{environment:'live',merchant:'chat.mural.ios',pollHistory:async(start,end,token)=>{
       calls.push({start,end,token});return {scheduled:0,nextPageToken:token?undefined:'last-page'};
     }});

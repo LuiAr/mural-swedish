@@ -4,6 +4,8 @@ The owner approved integrating upstream PRs [#171](https://github.com/Chuloo/mur
 
 Apple history catch-up now uses consecutive windows of at most seven days with five-minute overlap, preserved pagination dates and failed-page rollback. Checkout readiness still requires a recent verified completion. The monitor supports exact, audited helper-usage exceptions, but no exception entry, approval record, operational configuration or financial adjustment is added here. Both changes retain their upstream regression tests. No schema migration or runtime grant is added.
 
+The first full fork CI run passed 535 of 536 API tests and exposed a timing flaw in the upstream clock-advance test: its frozen JavaScript clock could precede PostgreSQL's default `next_poll_after=now()`. The fixture now explicitly sets an already-due timestamp under the frozen clock. All original page, timestamp and completion assertions remain, and production polling behavior is unchanged. The integration PR records the corrected full-suite result separately.
+
 The iPhone delivery metadata advances from build 11 to 12 in both the Xcode project and generator. Settings → What’s New adds **Keeping things steady**, dated 26 October, clearly describing maintenance rather than a new personal-key study feature. Previous release entries remain. Native app behavior, Talk, Swedish support, study tools, private settings and learning records are unchanged.
 
 ## Completed local validation
